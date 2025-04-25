@@ -237,58 +237,62 @@ class _AuthPageState extends State<AuthPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/background.jpg'), // Dodaj obrazek tła
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              child: Card(
-                elevation: 8, // Cień dla formularza
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16), // Zaokrąglone rogi
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (isLogin) _buildLoginFields(),
-                      if (!isLogin) _buildRegisterFields(),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _submit,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30), // Zaokrąglone przyciski
-                          ),
+          : Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Card(
+              elevation: 8,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (isLogin) _buildLoginFields(),
+                    if (!isLogin) _buildRegisterFields(),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _submit,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                        child: Text(isLogin ? 'ZALOGUJ' : 'ZAREJESTRUJ', style: const TextStyle(fontSize: 16)),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
-                      const SizedBox(height: 16),
-                      if (isLogin) TextButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+                      child: Text(
+                        isLogin ? 'ZALOGUJ' : 'ZAREJESTRUJ',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
                         ),
-                        child: const Text('Zapomniałeś hasła?'),
                       ),
-                      TextButton(
-                        onPressed: _switchAuthMode,
-                        child: Text(isLogin
+                    ),
+                    const SizedBox(height: 16),
+                    if (isLogin) TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+                      ),
+                      child: const Text('Zapomniałeś hasła?'),
+                    ),
+                    TextButton(
+                      onPressed: _switchAuthMode,
+                      child: Text(
+                        isLogin
                             ? 'Nie masz konta? Zarejestruj się'
-                            : 'Masz już konto? Zaloguj się'),
+                            : 'Masz już konto? Zaloguj się',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
