@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "688158558009",
+    "firebase_url": "https://notepaddb-5e65b-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "notepaddb-5e65b",
+    "storage_bucket": "notepaddb-5e65b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:688158558009:android:c0b66266b9ff2712a30ae8",
+        "android_client_info": {
+          "package_name": "pl.polsl.notepad"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCPi6ww69JYI92DVoaAy5mXrdGbA_8Rm6k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

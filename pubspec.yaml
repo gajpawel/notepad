@@ -17,12 +17,15 @@ dependencies:
   cupertino_icons: ^1.0.8
   fluttertoast: ^8.2.2
   intl: ^0.18.1
+  firebase_core: ^2.24.2
+  firebase_database: ^10.4.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
+
 
 # App icon configuration (now at root level)
 flutter_icons:
