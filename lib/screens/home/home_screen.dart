@@ -3,6 +3,7 @@ import '/services/auth_service.dart';
 import '/models/user.dart';
 import '/screens/login/auth_page.dart';
 import '/widgets/drawer.dart';
+import '/screens/home/new_note.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -75,18 +76,6 @@ class _MyHomePageState extends State<MyHomePage> {
         tooltip: 'Nowa notatka',
         child: const Icon(Icons.add),
       ),
-    );
-  }
-}
-
-class NewNote extends StatelessWidget {
-  const NewNote({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Nowa notatka')),
-      body: const Center(child: Text('Tutaj możesz dodać nową notatkę.')),
     );
   }
 }

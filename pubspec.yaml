@@ -19,7 +19,9 @@ dependencies:
   intl: ^0.18.1
   firebase_core: ^2.24.2
   firebase_database: ^10.4.2
-
+  process_run: ^1.2.4
+  file_picker: ^8.1.2
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
