@@ -15,7 +15,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String? _username;
+  String? _login;
 
   @override
   void initState() {
@@ -25,7 +25,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _loadCurrentUser() async {
     User? user = await AuthService.getCurrentUser();
-    if (user != null && mounted) setState(() => _username = user.username);
+    if (user != null && mounted) setState(() => _login = user.Login);
   }
 
   void _newNote() {
@@ -52,10 +52,10 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         actions: [
-          if (_username != null)
+          if (_login != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Center(child: Text('Witaj, $_username')),
+              child: Center(child: Text('Witaj, $_login')),
             ),
           IconButton(
             icon: const Icon(Icons.exit_to_app),

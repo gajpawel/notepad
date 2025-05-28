@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
 class RegisterForm extends StatelessWidget {
-  final TextEditingController usernameController;
-  final TextEditingController emailController;
+  final TextEditingController loginController;
+  final TextEditingController nameController;
+  final TextEditingController surnameController;
   final TextEditingController passwordController;
   final TextEditingController confirmPasswordController;
 
   const RegisterForm({
     Key? key,
-    required this.usernameController,
-    required this.emailController,
+    required this.loginController,
+    required this.nameController,
+    required this.surnameController,
     required this.passwordController,
     required this.confirmPasswordController,
   }) : super(key: key);
@@ -19,7 +21,7 @@ class RegisterForm extends StatelessWidget {
     return Column(
       children: [
         TextFormField(
-          controller: usernameController,
+          controller: loginController,
           decoration: const InputDecoration(
             labelText: 'Nazwa użytkownika',
             border: OutlineInputBorder(),
@@ -32,16 +34,25 @@ class RegisterForm extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         TextFormField(
-          controller: emailController,
+          controller: nameController,
           decoration: const InputDecoration(
-            labelText: 'Email',
+            labelText: 'Imię',
             border: OutlineInputBorder(),
           ),
           validator: (value) {
-            if (value!.isEmpty) return 'Podaj email';
-            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Niepoprawny email';
-            }
+            if (value!.isEmpty) return 'Podaj imię';
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: surnameController,
+          decoration: const InputDecoration(
+            labelText: 'Nazwisko',
+            border: OutlineInputBorder(),
+          ),
+          validator: (value) {
+            if (value!.isEmpty) return 'Podaj nazwisko';
             return null;
           },
         ),

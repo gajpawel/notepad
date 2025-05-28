@@ -21,7 +21,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       _errorMessage = null;
     });
 
-    User? user = await AuthService.findUserByUsernameOrEmail(
+    User? user = await AuthService.findUserByLogin(
       _loginController.text.trim(),
     );
     if (user == null) {
@@ -31,7 +31,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       });
       return;
     }
-
     if (mounted) {
       Navigator.push(
         context,
@@ -51,7 +50,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             TextFormField(
               controller: _loginController,
               decoration: const InputDecoration(
-                labelText: 'Podaj nazwę użytkownika lub email',
+                labelText: 'Podaj nazwę użytkownika',
                 border: OutlineInputBorder(),
               ),
             ),

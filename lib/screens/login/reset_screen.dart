@@ -33,7 +33,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       _errorMessage = null;
     });
 
-    await AuthService.updatePassword(widget.user, _newPasswordController.text);
+    await AuthService.updatePassword(widget.user.Login, _newPasswordController.text);
 
     if (mounted) {
       Navigator.popUntil(context, (route) => route.isFirst);

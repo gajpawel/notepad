@@ -17,7 +17,7 @@ class LoginForm extends StatelessWidget {
         TextFormField(
           controller: loginController,
           decoration: const InputDecoration(
-            labelText: 'Login (nazwa użytkownika lub email)',
+            labelText: 'Login (nazwa użytkownika)',
             border: OutlineInputBorder(),
           ),
           validator: (value) => value!.isEmpty ? 'Podaj login' : null,

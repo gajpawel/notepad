@@ -17,8 +17,9 @@ class _AuthPageState extends State<AuthPage> {
   bool isLogin = true;
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _loginController = TextEditingController();
-  final TextEditingController _regUsernameController = TextEditingController();
-  final TextEditingController _regEmailController = TextEditingController();
+  final TextEditingController _regLoginController = TextEditingController();
+  final TextEditingController _regNameController = TextEditingController();
+  final TextEditingController _regSurnameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
@@ -40,8 +41,9 @@ class _AuthPageState extends State<AuthPage> {
 
   void _switchAuthMode() {
     _loginController.clear();
-    _regUsernameController.clear();
-    _regEmailController.clear();
+    _regLoginController.clear();
+    _regNameController.clear();
+    _regSurnameController.clear();
     _passwordController.clear();
     _confirmPasswordController.clear();
     setState(() {
@@ -74,13 +76,14 @@ class _AuthPageState extends State<AuthPage> {
           return;
         }
         success = await AuthService.register(
-          _regUsernameController.text.trim(),
-          _regEmailController.text.trim(),
+          _regLoginController.text.trim(),
+          _regNameController.text.trim(),
+          _regSurnameController.text.trim(),
           _passwordController.text,
         );
         if (success)
           await AuthService.login(
-            _regEmailController.text.trim(),
+            _regNameController.text.trim(),
             _passwordController.text,
           );
       }
@@ -147,8 +150,9 @@ class _AuthPageState extends State<AuthPage> {
                               ),
                             if (!isLogin)
                               RegisterForm(
-                                usernameController: _regUsernameController,
-                                emailController: _regEmailController,
+                                loginController: _regLoginController,
+                                nameController: _regNameController,
+                                surnameController: _regSurnameController,
                                 passwordController: _passwordController,
                                 confirmPasswordController:
                                     _confirmPasswordController,
@@ -244,8 +248,8 @@ class _AuthPageState extends State<AuthPage> {
   @override
   void dispose() {
     _loginController.dispose();
-    _regUsernameController.dispose();
-    _regEmailController.dispose();
+    _regLoginController.dispose();
+    _regNameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
