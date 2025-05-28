@@ -8,6 +8,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:688158558009:android:13c9ec0fff34cff2a30ae8",
+        "android_client_info": {
+          "package_name": "com.example.notepad"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCPi6ww69JYI92DVoaAy5mXrdGbA_8Rm6k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:688158558009:android:c0b66266b9ff2712a30ae8",
         "android_client_info": {
           "package_name": "com.example.notepad"
