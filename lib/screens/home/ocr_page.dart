@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
-import 'dart:convert';
-import 'package:process_run/process_run.dart';
-import 'package:file_picker/file_picker.dart';
+import 'dart:io' show File;
+import 'package:Noteable/services/ocr/ocr_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class OCRPage extends StatefulWidget {
   const OCRPage({super.key});
@@ -18,8 +17,7 @@ class _OCRPageState extends State<OCRPage> {
   List<Map<String, dynamic>> _ocrResults = [];
   String? _selectedImagePath;
 
-  final String _pythonPath = 'python';
-  final String _scriptPath = 'ocr.py';
+  final OCRService _ocrService = OCRService();
 
   @override
   void dispose() {
@@ -29,92 +27,34 @@ class _OCRPageState extends State<OCRPage> {
   }
 
   Future<void> _pickImageAndRun() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: false,
-    );
-
-    if (result != null && result.files.single.path != null) {
-      String imagePath = result.files.single.path!;
+    final imagePath = await _ocrService.pickImage();
+    if (imagePath != null) {
       setState(() {
         _selectedImagePath = imagePath;
-      });
-      await _runOcrProcess(imagePath);
-    }
-  }
-
-  Future<void> _runOcrProcess(String imagePath) async {
-    setState(() {
-      _isProcessing = true;
-      _recognizedText = '';
-      _ocrResults.clear();
-    });
-
-    try {
-      if (!File(imagePath).existsSync()) {
-        throw Exception('Nie można znaleźć wybranego obrazu');
-      }
-
-      final shell = Shell();
-
-      final escapedScriptPath =
-          _scriptPath.contains(' ') ? '"$_scriptPath"' : _scriptPath;
-      final escapedImagePath =
-          imagePath.contains(' ') ? '"$imagePath"' : imagePath;
-
-      print('Uruchamianie: $_pythonPath $escapedScriptPath $escapedImagePath');
-
-      final pythonResult = await shell.run(
-        '$_pythonPath $escapedScriptPath $escapedImagePath',
-      );
-
-      if (pythonResult.isEmpty) {
-        throw Exception('Brak odpowiedzi ze skryptu Python');
-      }
-
-      final processResult = pythonResult.first;
-
-      if (processResult.exitCode != 0) {
-        final errorMsg = processResult.stderr.toString();
-        print('Błąd stderr: $errorMsg');
-        throw Exception(
-          'Błąd skryptu Python (kod: ${processResult.exitCode}): $errorMsg',
-        );
-      }
-
-      final outputStr = processResult.stdout.toString().trim();
-      if (outputStr.isEmpty) {
-        throw Exception('Pusty wynik ze skryptu Python');
-      }
-
-      print('Wynik skryptu: $outputStr');
-
-      final output = json.decode(outputStr);
-      if (output.containsKey('error')) {
-        throw Exception(output['error']);
-      }
-
-      final results = output['results'] as List;
-      setState(() {
-        _ocrResults = results.cast<Map<String, dynamic>>();
-        _recognizedText = results
-            .map((result) => result['text'] as String)
-            .where((text) => text.isNotEmpty)
-            .join(' ');
-        _isProcessing = false;
+        _isProcessing = true;
+        _recognizedText = '';
+        _ocrResults.clear();
       });
 
-      if (_recognizedText.isNotEmpty) {
-        _showMessage('Rozpoznano tekst z obrazu!');
-      } else {
-        _showMessage('Nie rozpoznano tekstu z obrazu');
+      try {
+        final result = await _ocrService.processImage(imagePath);
+        setState(() {
+          _recognizedText = result['text'] as String;
+          _ocrResults = [result];
+          _isProcessing = false;
+        });
+
+        if (_recognizedText.isNotEmpty) {
+          _showMessage('Rozpoznano tekst z obrazu!');
+        } else {
+          _showMessage('Nie rozpoznano tekstu z obrazu');
+        }
+      } catch (e) {
+        setState(() {
+          _isProcessing = false;
+        });
+        _showMessage('Błąd podczas przetwarzania obrazu: $e');
       }
-    } catch (e) {
-      setState(() {
-        _isProcessing = false;
-      });
-      print('Błąd OCR: $e');
-      _showMessage('Błąd podczas przetwarzania obrazu: $e');
     }
   }
 
@@ -151,12 +91,20 @@ class _OCRPageState extends State<OCRPage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.file(
-          File(_selectedImagePath!),
-          height: 200,
-          width: double.infinity,
-          fit: BoxFit.contain,
-        ),
+        child:
+            kIsWeb
+                ? Image.network(
+                  _selectedImagePath!,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                )
+                : Image.file(
+                  File(_selectedImagePath!),
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                ),
       ),
     );
   }
@@ -217,7 +165,6 @@ class _OCRPageState extends State<OCRPage> {
               ),
             ),
             const SizedBox(height: 16),
-
             ExpansionTile(
               title: const Text('Szczegóły rozpoznawania'),
               children:
@@ -305,9 +252,7 @@ class _OCRPageState extends State<OCRPage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
-
             Center(
               child: ElevatedButton.icon(
                 onPressed: _isProcessing ? null : _pickImageAndRun,
@@ -335,11 +280,8 @@ class _OCRPageState extends State<OCRPage> {
                 ),
               ),
             ),
-
             _buildImagePreview(),
-
             _buildResultsSection(),
-
             if (_recognizedText.isNotEmpty) ...[
               const SizedBox(height: 24),
               Center(

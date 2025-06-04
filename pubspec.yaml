@@ -21,6 +21,7 @@ dependencies:
   firebase_database: ^10.4.2
   process_run: ^1.2.4
   file_picker: ^8.1.2
+  js: ^0.6.7
   
 dev_dependencies:
   flutter_test:
