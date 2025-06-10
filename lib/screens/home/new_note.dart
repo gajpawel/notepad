@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'ocr_page.dart';
 
 class NewNote extends StatelessWidget {
-  const NewNote({super.key});
+  final int? NoteId;
+
+  const NewNote({super.key, required this.NoteId});
 
   @override
   Widget build(BuildContext context) {

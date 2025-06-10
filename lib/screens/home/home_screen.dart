@@ -136,10 +136,113 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _newNote() {
+  void _openNote(int noteId){
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const NewNote()),
+      MaterialPageRoute(
+        builder: (context) => NewNote(NoteId: noteId),
+      ),
+    );
+  }
+
+  void _newNote() async {
+    final TextEditingController nameController = TextEditingController();
+
+    final newId = DateTime.now().millisecondsSinceEpoch;
+
+    await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Nowa notatka'),
+      content: TextField(
+        controller: nameController,
+        decoration: const InputDecoration(labelText: 'Nazwa notatki'),
+      ),
+      actions: [
+        TextButton(
+          child: const Text('Anuluj'),
+          onPressed: () => Navigator.pop(context),
+        ),
+        TextButton(
+          child: const Text('Utwórz'),
+          onPressed: () async {
+            Navigator.pop(context);
+
+            if (nameController.text.trim().isEmpty || _login == null) return;
+
+            final newNoteRef = _db.child('Note').push();
+
+            final now = DateTime.now().toString();
+
+            final note = {
+              'Id': newId,
+              'Name': nameController.text.trim(),
+              'CreationDate': now,
+              'ModificationDate': now,
+              'OwnerId': _login,
+              'FolderId': widget.folderId ?? 0,
+              'Status': true,
+              'Content': "",
+            };
+
+            await newNoteRef.set(note);
+            _loadData();
+          },
+        ),
+      ],
+    ),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => NewNote(NoteId: newId)),
+    );
+  }
+
+  void _newFolder() async {
+    final TextEditingController nameController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nowy folder'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(labelText: 'Nazwa folderu'),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Anuluj'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          TextButton(
+            child: const Text('Utwórz'),
+            onPressed: () async {
+              Navigator.pop(context);
+
+              if (nameController.text.trim().isEmpty || _login == null) return;
+
+              final newFolderRef = _db.child('Folder').push();
+              final newId = DateTime.now().millisecondsSinceEpoch;
+
+              final now = DateTime.now().toString();
+
+              final folder = {
+                'Id': newId,
+                'Name': nameController.text.trim(),
+                'CreationDate': now,
+                'ModificationDate': now,
+                'OwnerId': _login,
+                'ParentFolderId': widget.folderId ?? 0,
+                'Status': true,
+              };
+
+              await newFolderRef.set(folder);
+              _loadData();
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -227,15 +330,29 @@ class _MyHomePageState extends State<MyHomePage> {
             leading: const Icon(Icons.note),
             title: Text(n.Name),
             onTap: () {
-              // Możesz dodać ekran wyświetlania notatki
+              _openNote(n.Id);
             },
           )),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _newNote,
-        tooltip: 'Nowa notatka',
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'folderBtn',
+            onPressed: _newFolder,
+            tooltip: 'Nowy folder',
+            child: const Icon(Icons.create_new_folder),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            heroTag: 'noteBtn',
+            onPressed: _newNote,
+            tooltip: 'Nowa notatka',
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 import '/services/auth_service.dart';
 import '/models/User.dart';
 import '/models/Note.dart';
+import 'new_note.dart';
 
 class SharedNotesPage extends StatefulWidget {
   const SharedNotesPage({super.key});
@@ -68,6 +69,15 @@ class _SharedNotesPageState extends State<SharedNotesPage> {
     });
   }
 
+  void _openNote(int noteId){
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NewNote(NoteId: noteId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,7 +95,7 @@ class _SharedNotesPageState extends State<SharedNotesPage> {
             title: Text(note.Name),
             subtitle: Text("Data modyfikacji: ${note.ModificationDate}"),
             onTap: () {
-              // Możesz dodać ekran otwierania notatki
+              _openNote(note.Id);
             },
           );
         },
