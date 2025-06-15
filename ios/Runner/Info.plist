@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ta aplikacja potrzebuje dostępu do mikrofonu, aby rozpoznawać mowę.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Noteable</string>
 	<key>CFBundleExecutable</key>

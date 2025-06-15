@@ -1,19 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -32,6 +19,31 @@
   <title>Noteable</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://unpkg.com/tesseract.js@v5.1.0/dist/tesseract.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="permissions-policy" content="microphone=*">
+  
+  <script>
+    window.addEventListener('load', function(ev) {
+      // Sprawdź wsparcie dla Web Speech API
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        console.log('Speech Recognition API jest dostępne');
+      } else {
+        console.warn('Speech Recognition API nie jest dostępne w tej przeglądarce');
+      }
+      
+      // Poproś o uprawnienia do mikrofonu przy starcie (opcjonalne)
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(function(stream) {
+            console.log('Uprawnienia do mikrofonu przyznane');
+            stream.getTracks().forEach(track => track.stop()); // Zatrzymaj stream
+          })
+          .catch(function(err) {
+            console.log('Brak uprawnień do mikrofonu:', err);
+          });
+      }
+    });
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

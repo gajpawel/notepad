@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:io' show File;
 import 'package:Noteable/services/ocr/ocr_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../speech_recognition_screen.dart';
 
 class OCRPage extends StatefulWidget {
   const OCRPage({super.key});
@@ -77,6 +78,16 @@ class _OCRPageState extends State<OCRPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  // NOWA FUNKCJA - przejście do Speech Recognition
+  void _goToSpeechRecognition() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SpeechRecognitionScreen(),
+      ),
+    );
   }
 
   Widget _buildImagePreview() {
@@ -202,10 +213,16 @@ class _OCRPageState extends State<OCRPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rozpoznawanie tekstu OCR'),
+        title: const Text('Rozpoznawanie tekstu'),
         backgroundColor: Colors.blue.shade600,
         foregroundColor: Colors.white,
         actions: [
+          // NOWY PRZYCISK - Speech Recognition w AppBar
+          IconButton(
+            icon: const Icon(Icons.mic),
+            onPressed: _goToSpeechRecognition,
+            tooltip: 'Rozpoznawanie mowy',
+          ),
           if (_recognizedText.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.clear),
@@ -243,43 +260,71 @@ class _OCRPageState extends State<OCRPage> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
+                    '📷 OCR - Rozpoznawanie tekstu z obrazu:\n'
                     '1. Kliknij "Wybierz obraz i uruchom OCR"\n'
                     '2. Wybierz obraz z dysku\n'
-                    '3. Poczekaj na przetworzenie obrazu\n'
-                    '4. Rozpoznany tekst pojawi się poniżej',
+                    '3. Poczekaj na przetworzenie obrazu\n\n'
+                    '🎤 Speech - Rozpoznawanie mowy:\n'
+                    '• Kliknij ikonę mikrofonu w prawym górnym rogu',
                     style: TextStyle(fontSize: 14),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: _isProcessing ? null : _pickImageAndRun,
-                icon:
-                    _isProcessing
-                        ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                        : const Icon(Icons.image_search, size: 24),
-                label: Text(
-                  _isProcessing
-                      ? 'Przetwarzanie...'
-                      : 'Wybierz obraz i uruchom OCR',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
+            
+            // NOWA SEKCJA - Wybór metody rozpoznawania
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isProcessing ? null : _pickImageAndRun,
+                    icon:
+                        _isProcessing
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Icon(Icons.image_search, size: 24),
+                    label: Text(
+                      _isProcessing
+                          ? 'Przetwarzanie...'
+                          : 'OCR z obrazu',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _goToSpeechRecognition,
+                    icon: const Icon(Icons.mic, size: 24),
+                    label: const Text(
+                      'Rozpoznaj mowę',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+            
             _buildImagePreview(),
             _buildResultsSection(),
             if (_recognizedText.isNotEmpty) ...[

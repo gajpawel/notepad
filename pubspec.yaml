@@ -1,7 +1,6 @@
 name: Noteable
 description: "Now you're able to Note. Noteable."
 
-
 # Prevent accidental publishing
 publish_to: 'none'
 
@@ -13,10 +12,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:    
+    sdk: flutter
   shared_preferences: ^2.2.0
   cupertino_icons: ^1.0.8
   fluttertoast: ^8.2.2
-  intl: ^0.18.1
+  intl: 0.20.2
   firebase_core: ^2.24.2
   firebase_database: ^10.4.2
   process_run: ^1.2.4
@@ -24,13 +25,15 @@ dependencies:
   js: ^0.6.7
   google_mlkit_text_recognition: ^0.13.0
   image_picker: ^1.1.2
+  google_fonts: ^6.1.0
+  speech_to_text: ^6.6.0
+  permission_handler: ^11.3.1
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
-
 
 # App icon configuration (now at root level)
 flutter_icons:
