@@ -9,6 +9,7 @@ import '/models/Note.dart';
 import '/screens/login/auth_page.dart';
 import '/screens/home/new_note.dart';
 import '/widgets/drawer.dart';
+import 'package:intl/intl.dart';
 
 class MyHomePage extends StatefulWidget {
   final String title;
@@ -147,56 +148,61 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _newNote() async {
     final TextEditingController nameController = TextEditingController();
-
     final newId = DateTime.now().millisecondsSinceEpoch;
 
-    await showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Nowa notatka'),
-      content: TextField(
-        controller: nameController,
-        decoration: const InputDecoration(labelText: 'Nazwa notatki'),
+    final bool? shouldCreate = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nowa notatka'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(labelText: 'Nazwa notatki'),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Anuluj'),
+            onPressed: () => Navigator.pop(context, false), // zwróć false
+          ),
+          TextButton(
+            child: const Text('Utwórz'),
+            onPressed: () async {
+              if (nameController.text.trim().isEmpty || _login == null) {
+                Navigator.pop(context, false);
+                return;
+              }
+
+              final newNoteRef = _db.child('Note').push();
+              final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
+              final now = formatter.format(DateTime.now());
+
+              final note = {
+                'Id': newId,
+                'Name': nameController.text.trim(),
+                'CreationDate': now,
+                'ModificationDate': now,
+                'OwnerId': _login,
+                'FolderId': widget.folderId ?? 0,
+                'Status': true,
+                'Content': "",
+              };
+
+              await newNoteRef.set(note);
+              _loadData();
+
+              Navigator.pop(context, true); // zwróć true
+            },
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          child: const Text('Anuluj'),
-          onPressed: () => Navigator.pop(context),
-        ),
-        TextButton(
-          child: const Text('Utwórz'),
-          onPressed: () async {
-            Navigator.pop(context);
-
-            if (nameController.text.trim().isEmpty || _login == null) return;
-
-            final newNoteRef = _db.child('Note').push();
-
-            final now = DateTime.now().toString();
-
-            final note = {
-              'Id': newId,
-              'Name': nameController.text.trim(),
-              'CreationDate': now,
-              'ModificationDate': now,
-              'OwnerId': _login,
-              'FolderId': widget.folderId ?? 0,
-              'Status': true,
-              'Content': "",
-            };
-
-            await newNoteRef.set(note);
-            _loadData();
-          },
-        ),
-      ],
-    ),
     );
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => NewNote(NoteId: newId)),
-    );
+    // Przejdź do nowej notatki tylko jeśli użytkownik kliknął "Utwórz"
+    if (shouldCreate == true) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => NewNote(NoteId: newId)),
+      );
+    }
   }
 
   void _newFolder() async {
@@ -225,7 +231,8 @@ class _MyHomePageState extends State<MyHomePage> {
               final newFolderRef = _db.child('Folder').push();
               final newId = DateTime.now().millisecondsSinceEpoch;
 
-              final now = DateTime.now().toString();
+              final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
+              final now = formatter.format(DateTime.now());
 
               final folder = {
                 'Id': newId,
