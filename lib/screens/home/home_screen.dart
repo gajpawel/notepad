@@ -1,9 +1,12 @@
 import 'package:Noteable/screens/home/shared_notes.dart';
 import 'package:Noteable/screens/home/deleted_notes.dart';
+import 'package:Noteable/utils/clipboard_manager.dart';
+import 'package:Noteable/utils/note_downloader.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '/services/auth_service.dart';
 import '/models/User.dart';
+import '/models/Collaborator.dart';
 import '/models/Folder.dart';
 import '/models/Note.dart';
 import '/screens/login/auth_page.dart';
@@ -22,6 +25,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  Note? _clipboardNote;
+  bool _isCutOperation = false;
   final _db = FirebaseDatabase.instance.ref();
   String? _login;
   Folder? _currentFolder;
@@ -105,6 +110,21 @@ class _MyHomePageState extends State<MyHomePage> {
       _folders = folders;
       _notes = notes;
     });
+  }
+
+  Future<List<User>> _fetchActiveUsers() async {
+    final usersRef = _db.child('Users');
+    final snapshot = await usersRef.get();
+
+    if (snapshot.exists) {
+      final Map data = snapshot.value as Map;
+      return data.values
+          .map((e) => User.fromJson(Map<String, dynamic>.from(e)))
+          .where((u) => u.Status == true)
+          .toList();
+    } else {
+      return [];
+    }
   }
 
   void _openFolder(int folderId) {
@@ -201,6 +221,161 @@ class _MyHomePageState extends State<MyHomePage> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => NewNote(noteId: newId)),
+      );
+    }
+  }
+
+  void _editNoteName(Note note) {
+    final _controller = TextEditingController(text: note.Name);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Edytuj nazwę notatki'),
+          content: TextField(
+            controller: _controller,
+            decoration: const InputDecoration(
+              labelText: 'Nowa nazwa',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // zamknij dialog
+              },
+              child: const Text('Anuluj'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newName = _controller.text.trim();
+                if (newName.isNotEmpty) {
+                  final noteRef = _db.child('Note');
+                  final snapshot = await noteRef.get();
+
+                  if (snapshot.exists && snapshot.value is Map) {
+                    final data = snapshot.value as Map;
+                    for (var key in data.keys) {
+                      final item = data[key];
+                      if (item is Map && item['Id'] == note.Id) {
+                        await noteRef.child(key).update({'Name': newName});
+                        break;
+                      }
+                    }
+                  }
+
+                  Navigator.of(context).pop();
+                  _loadData();
+                }
+              },
+              child: const Text('Zapisz'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _addCollaborator(Note note) async {
+    List<User> users = await _fetchActiveUsers();
+    User? selectedUser;
+
+    if (users.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Brak aktywnych użytkowników')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Text('Dodaj współtwórcę'),
+            content: DropdownButtonFormField<User>(
+              items: users.map((user) {
+                return DropdownMenuItem<User>(
+                  value: user,
+                  child: Text('${user.Name} ${user.Surname} (${user.Login})'),
+                );
+              }).toList(),
+              onChanged: (User? user) {
+                setState(() {
+                  selectedUser = user;
+                });
+              },
+              hint: const Text('Wybierz użytkownika'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Anuluj'),
+              ),
+              ElevatedButton(
+                onPressed: selectedUser == null
+                    ? null
+                    : () async {
+                  final collabRef = _db.child('Collaborators');
+                  final snapshot = await collabRef.get();
+                  int newId = 1;
+
+                  if (snapshot.exists && snapshot.value is Map) {
+                    final data = Map<String, dynamic>.from(snapshot.value as Map);
+                    final ids = data.values.map((e) => e['Id'] as int).toList();
+                    newId = (ids.isNotEmpty ? ids.reduce((a, b) => a > b ? a : b) + 1 : 1);
+                  }
+
+                  final newCollab = Collaborator(
+                    Id: newId,
+                    CollaboratorId: selectedUser!.Login,
+                    NoteId: note.Id,
+                  );
+
+                  await collabRef.push().set(newCollab.toJson());
+
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Dodano współtwórcę')),
+                  );
+                },
+                child: const Text('Dodaj'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+
+  Future<void> _deleteNote(int noteId) async {
+    final noteRef = _db.child('Note');
+    final snapshot = await noteRef.get();
+
+    if (snapshot.exists && snapshot.value is Map) {
+      final data = snapshot.value as Map;
+      for (var key in data.keys) {
+        final item = data[key];
+        if (item is Map && item['Id'] == noteId) {
+          await noteRef.child(key).update({'Status': false});
+          break;
+        }
+      }
+    }
+
+    // Odśwież widok
+    _loadData();
+  }
+
+  void _downloadNote(Note note) {
+    try {
+      // Jeśli platforma mobilna – wymagany context
+      // Jeśli web – context jest ignorowany
+      downloadNote(note, context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Błąd podczas pobierania notatki: $e")),
       );
     }
   }
@@ -339,6 +514,102 @@ class _MyHomePageState extends State<MyHomePage> {
             onTap: () {
               _openNote(n.Id);
             },
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) async {
+                if (value == 'delete') {
+                  _deleteNote(n.Id);
+                } else if (value == 'addCollaborator') {
+                  _addCollaborator(n);
+                } else if (value == 'edit') {
+                  _editNoteName(n);
+                } else if (value == 'download') {
+                  _downloadNote(n);
+                } else if (value == 'copy') {
+                  ClipboardManager.copy(n);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notatka skopiowana')),
+                  );
+                } else if (value == 'cut') {
+                  ClipboardManager.cut(n);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notatka wycięta')),
+                  );
+                } else if (value == 'paste') {
+                  await ClipboardManager.paste(_db);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Notatka wklejona jako nowa')),
+                  );
+                  _loadData(); // odświeżenie widoku
+                }
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, color: Colors.yellow),
+                      SizedBox(width: 8),
+                      Text('Edytuj nazwę'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'addCollaborator',
+                  child: Row(
+                    children: [Icon(Icons.group_add, color: Colors.teal), SizedBox(width: 8), Text('Dodaj współtwórcę')],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Usuń'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'download',
+                  child: Row(
+                    children: [
+                      Icon(Icons.download, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('Pobierz notatkę'),
+                    ],
+                  )
+                ),
+                const PopupMenuItem(
+                    value: 'copy',
+                  child: Row(
+                    children: [
+                      Icon(Icons.copy, color: Colors.grey),
+                      SizedBox(width: 8),
+                      Text('Kopiuj'),
+                    ],
+                  )
+                ),
+                const PopupMenuItem(
+                    value: 'cut',
+                    child: Row(
+                      children: [
+                        Icon(Icons.cut, color: Colors.orange),
+                        SizedBox(width: 8),
+                        Text('Wytnij'),
+                      ],
+                    )
+                ),
+                PopupMenuItem(
+                    value: 'paste',
+                    enabled: ClipboardManager.hasData(),
+                    child: Row(
+                      children: [
+                        Icon(Icons.paste, color: Colors.purple),
+                        SizedBox(width: 8),
+                        Text('Wklej'),
+                      ],
+                    )
+                )
+              ],
+            ),
           )),
         ],
       ),

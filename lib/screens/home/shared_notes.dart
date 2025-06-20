@@ -32,7 +32,7 @@ class _SharedNotesPageState extends State<SharedNotesPage> {
       _login = userLogin;
     });
 
-    final collaboratorsSnap = await _db.child('Collaborator').get();
+    final collaboratorsSnap = await _db.child('Collaborators').get();
     final notesSnap = await _db.child('Note').get();
 
     Set<String> sharedNoteIds = {};
@@ -64,6 +64,7 @@ class _SharedNotesPageState extends State<SharedNotesPage> {
       }
     }
 
+    sharedNotes.sort((a, b) => b.ModificationDate.compareTo(a.ModificationDate));
     setState(() {
       _sharedNotes = sharedNotes;
     });
