@@ -73,7 +73,7 @@ class _SharedNotesPageState extends State<SharedNotesPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => NewNote(NoteId: noteId),
+        builder: (context) => NewNote(noteId: noteId),
       ),
     );
   }

@@ -141,7 +141,7 @@ class _MyHomePageState extends State<MyHomePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => NewNote(NoteId: noteId),
+        builder: (context) => NewNote(noteId: noteId),
       ),
     );
   }
@@ -200,7 +200,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (shouldCreate == true) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => NewNote(NoteId: newId)),
+        MaterialPageRoute(builder: (context) => NewNote(noteId: newId)),
       );
     }
   }
