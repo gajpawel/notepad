@@ -25,8 +25,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  Note? _clipboardNote;
-  bool _isCutOperation = false;
   final _db = FirebaseDatabase.instance.ref();
   String? _login;
   Folder? _currentFolder;
@@ -44,7 +42,7 @@ class _MyHomePageState extends State<MyHomePage> {
     User? user = await AuthService.getCurrentUser();
     if (user == null) return;
 
-    final userId = user.Login;
+    final userId = user.Login; // userId jest Stringiem (np. "pawel")
     setState(() {
       _login = user.Login;
     });
@@ -55,56 +53,90 @@ class _MyHomePageState extends State<MyHomePage> {
     List<Folder> folders = [];
     List<Note> notes = [];
 
+    // Wczytywanie folderów
     if (foldersSnap.exists && foldersSnap.value is Map) {
       final data = foldersSnap.value as Map;
       for (var item in data.values) {
         if (item is Map) {
-          final folder = Folder.fromJson(Map<String, dynamic>.from(item));
-          if (folder.OwnerId == userId &&
-              (widget.folderId == null
-                  ? folder.ParentFolderId == 0
-                  : folder.ParentFolderId == widget.folderId)) {
-            folders.add(folder);
+          try {
+            final folder = Folder.fromJson(Map<String, dynamic>.from(item));
+            // Porównanie OwnerId jako String
+            if (folder.OwnerId == userId && // Zakładamy, że OwnerId jest Stringiem
+                (widget.folderId == null
+                    ? folder.ParentFolderId == 0
+                    : folder.ParentFolderId == widget.folderId)) {
+              folders.add(folder);
+            }
+          } catch (e) {
+            print('Błąd parsowania folderu: $e');
           }
         }
       }
     }
 
+    // Wczytywanie bieżącego folderu
     if (widget.folderId != null && foldersSnap.exists && foldersSnap.value is Map) {
       final data = foldersSnap.value as Map;
       for (var item in data.values) {
         if (item is Map) {
-          final folder = Folder.fromJson(Map<String, dynamic>.from(item));
-          if (folder.Id == widget.folderId) {
-            _currentFolder = folder;
-            break;
+          try {
+            final folder = Folder.fromJson(Map<String, dynamic>.from(item));
+            if (folder.Id == widget.folderId) {
+              _currentFolder = folder;
+              break;
+            }
+          } catch (e) {
+            print('Błąd parsowania folderu dla _currentFolder: $e');
           }
         }
       }
     }
 
-    if(widget.folderId == null || widget.folderId == 0) {
-      final shared = Folder(Id: -2, Name: "Udostępnione", OwnerId: _login.toString(), ParentFolderId: 0, CreationDate: "", ModificationDate: "");
+    // Dodanie domyślnych folderów
+    if (widget.folderId == null || widget.folderId == 0) {
+      final defaultOwnerId = _login ?? 'default_user'; // Unikamy null, używamy wartości domyślnej
+      final shared = Folder(
+        Id: -2,
+        Name: "Udostępnione",
+        OwnerId: defaultOwnerId,
+        ParentFolderId: 0,
+        CreationDate: DateTime.now(),
+        ModificationDate: DateTime.now(),
+        Status: true,
+      );
       folders.add(shared);
-      final deleted = Folder(Id: -1, Name: "Kosz", OwnerId: _login.toString(), ParentFolderId: 0, CreationDate: "", ModificationDate: "");
+      final deleted = Folder(
+        Id: -1,
+        Name: "Kosz",
+        OwnerId: defaultOwnerId,
+        ParentFolderId: 0,
+        CreationDate: DateTime.now(),
+        ModificationDate: DateTime.now(),
+        Status: true,
+      );
       folders.add(deleted);
     }
 
+    // Wczytywanie notatek
     if (notesSnap.exists && notesSnap.value is Map) {
       final data = notesSnap.value as Map;
       for (var item in data.values) {
         if (item is Map) {
-          final note = Note.fromJson(Map<String, dynamic>.from(item));
-          if (note.OwnerId == userId && note.Status == true &&
-              (widget.folderId == null
-                  ? note.FolderId == 0 || note.FolderId == null
-                  : note.FolderId == widget.folderId)) {
-            notes.add(note);
+          try {
+            final note = Note.fromJson(Map<String, dynamic>.from(item));
+            // Porównanie OwnerId jako String
+            if (note.OwnerId == userId && note.Status == true &&
+                (widget.folderId == null
+                    ? note.FolderId == 0 || note.FolderId == null
+                    : note.FolderId == widget.folderId)) {
+              notes.add(note);
+            }
+          } catch (e) {
+            print('Błąd parsowania notatki: $e');
           }
         }
       }
     }
-
 
     setState(() {
       _folders = folders;
@@ -428,6 +460,65 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void _editFolderName(Folder folder) async {
+    final controller = TextEditingController(text: folder.Name);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Zmień nazwę folderu'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Nowa nazwa'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Anuluj')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Zapisz')),
+        ],
+      ),
+    );
+
+    if (newName != null && newName.trim().isNotEmpty) {
+      final updatedFolder = Folder(
+        Id: folder.Id,
+        Name: newName.trim(),
+        OwnerId: folder.OwnerId,
+        ParentFolderId: folder.ParentFolderId,
+        CreationDate: folder.CreationDate,
+        ModificationDate: DateTime.now(),
+        Status: folder.Status,
+      );
+      await _db.child('Folder/${folder.Id}').set(updatedFolder.toJson());
+      print('Folder zaktualizowany: ${folder.Name} -> $newName');
+      _loadData();
+    }
+  }
+
+  void _copyFolder(Folder folder) {
+    ClipboardManager.copyFolder(folder);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Folder skopiowany')));
+    print('Skopiowano folder: ${folder.Name}');
+  }
+
+  void _cutFolder(Folder folder) {
+    ClipboardManager.cutFolder(folder);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Folder wycięty')));
+    print('Wytnięto folder: ${folder.Name}');
+  }
+
+  Future<void> _pasteFolder(int? parentFolderId) async {
+    await ClipboardManager.pasteFolder(_db, parentFolderId);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Folder wklejony')));
+    print('Wklejono folder do folderu: $parentFolderId');
+    _loadData();
+  }
+
+  void _deleteFolder(Folder folder) async {
+    await _db.child('Folder/${folder.Id}').update({'Status': false});
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Folder usunięty')));
+    print('Usunięto folder: ${folder.Name}');
+    _loadData();
+  }
+
   void _logout() async {
     await AuthService.logout();
     if (mounted) {
@@ -500,9 +591,85 @@ class _MyHomePageState extends State<MyHomePage> {
             child: Text("📁 Foldery", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
           ..._folders.map((f) => ListTile(
-            leading: f.Id == -1 ? const Icon(Icons.delete, color: Colors.blue) : f.Id == -2 ? Icon(Icons.folder_shared, color: Colors.blue) : Icon(Icons.folder),
+            leading: f.Id == -1
+                ? const Icon(Icons.delete, color: Colors.blue)
+                : f.Id == -2
+                ? const Icon(Icons.folder_shared, color: Colors.blue)
+                : const Icon(Icons.folder),
             title: Text(f.Name),
-            onTap: () => f.Id == -1 ? _openSpecialFolder("deleted") : f.Id == -2 ? _openSpecialFolder("shared") : _openFolder(f.Id),
+            onTap: () => f.Id == -1
+                ? _openSpecialFolder("deleted")
+                : f.Id == -2
+                ? _openSpecialFolder("shared")
+                : _openFolder(f.Id),
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) async {
+                if (value == 'delete') {
+                  _deleteFolder(f);
+                } else if (value == 'edit') {
+                  _editFolderName(f);
+                } else if (value == 'copy') {
+                  _copyFolder(f);
+                } else if (value == 'cut') {
+                  _cutFolder(f);
+                } else if (value == 'paste') {
+                  await _pasteFolder(f.Id);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, color: Colors.yellow),
+                      SizedBox(width: 8),
+                      Text('Edytuj nazwę'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Usuń'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'copy',
+                  child: Row(
+                    children: [
+                      Icon(Icons.copy, color: Colors.yellow), // Poprawiono na Icons.copy
+                      SizedBox(width: 8),
+                      Text('Kopiuj'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'cut',
+                  child: Row(
+                    children: [
+                      Icon(Icons.cut, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text('Wytnij'),
+                    ],
+                  ),
+                ),
+                if (ClipboardManager.hasFolder())
+                  const PopupMenuItem(
+                    value: 'paste',
+                    child: Row(
+                      children: [
+                        Icon(Icons.paste, color: Colors.purple), // Poprawiono na Icons.paste
+                        SizedBox(width: 8),
+                        Text('Wklej'),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           )),
           const Padding(
             padding: EdgeInsets.all(8.0),

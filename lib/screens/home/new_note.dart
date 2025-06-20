@@ -63,7 +63,7 @@ class _NewNoteState extends State<NewNote> {
     if (_note == null) return;
 
     final updatedContent = _textController.text.trim();
-    final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+    final now = DateTime.now();
 
     try {
       final snapshot = await _dbRef.child('Note').get();
