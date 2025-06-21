@@ -21,7 +21,7 @@ dependencies {
 }
 android {
     namespace = "com.example.notepad"
-    compileSdk = 34
+    compileSdk = 35
     ndkVersion = "27.0.12077973"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

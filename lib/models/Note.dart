@@ -51,7 +51,7 @@ class Note {
   Map<String, dynamic> toJson() {
     return {
       'Id': Id,
-      'Title': Name,
+      'Name': Name,
       'OwnerId': OwnerId,
       'Content': Content,
       'FolderId': FolderId,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'screens/login/auth_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 
 const FirebaseOptions firebaseOptions = FirebaseOptions(
   apiKey: "AIzaSyA7TvPSmjOk3qZirF_u3dXVCt7a0rHTyDs",
@@ -37,6 +39,15 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('pl'),
+      ],
       home: const AuthPage(),
     );
   }
