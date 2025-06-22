@@ -15,10 +15,11 @@ dependencies:
   flutter_localizations:    
     sdk: flutter
   shared_preferences: ^2.2.0
+  archive: ^3.3.7
   cupertino_icons: ^1.0.8
   fluttertoast: ^8.2.2
   intl: 0.20.2
-  path_provider: ^2.0.14
+  path_provider: ^2.1.1
   firebase_core: ^2.24.2
   firebase_database: ^10.4.2
   process_run: ^1.2.4
@@ -30,6 +31,7 @@ dependencies:
   speech_to_text: ^7.0.0
   permission_handler: ^11.3.1
   flutter_quill: ^11.4.1
+  web: 1.1.1
   
 dev_dependencies:
   flutter_test:

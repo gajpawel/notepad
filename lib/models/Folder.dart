@@ -23,16 +23,15 @@ class Folder {
   factory Folder.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(String? dateStr) {
       if (dateStr == null) return null;
+      final trimmed = dateStr.trim();
       try {
-        // Spróbuj sparsować z literą "T"
         try {
-          return DateFormat('yyyy-MM-ddTHH:mm:ss').parse(dateStr);
+          return DateFormat('yyyy-MM-ddTHH:mm:ss.SSS').parse(trimmed);
         } catch (e) {
-          // Jeśli nie, parsuj ze spacją
-          return DateFormat('yyyy-MM-dd HH:mm:ss').parse(dateStr);
+          return DateFormat('yyyy-MM-dd HH:mm:ss').parse(trimmed);
         }
       } catch (e) {
-        print('Błąd parsowania daty w Folder: $dateStr - $e');
+        print('Błąd parsowania daty w Folder: $trimmed - $e');
         return DateTime.now();
       }
     }

@@ -16,17 +16,29 @@ class ClipboardManager {
     _isFolderClipboard = false;
   }
 
-  static void cut(Note note) {
+  static Future<void> cut(Note note, DatabaseReference db) async {
     _clipboardNote = note;
     _clipboardFolder = null;
     _isCutOperation = true;
     _isFolderClipboard = false;
+
+    // Ustaw Status=false aby zniknęła z widoku
+    final notesSnap = await db.child('Note').get();
+    if (notesSnap.exists && notesSnap.value is Map) {
+      final data = notesSnap.value as Map;
+      for (var entry in data.entries) {
+        if (entry.value is Map && entry.value['Id'] == note.Id) {
+          await db.child('Note').child(entry.key).update({'Status': false});
+          break;
+        }
+      }
+    }
   }
 
   static bool hasData() => _clipboardNote != null;
   static bool hasFolder() => _clipboardFolder != null;
 
-  static Future<void> paste(DatabaseReference db) async {
+  static Future<void> paste(DatabaseReference db, int folderId) async {
     if (_clipboardNote == null) return;
 
     final now = DateTime.now().toIso8601String();
@@ -67,7 +79,7 @@ class ClipboardManager {
       Id: newNoteId,
       Name: newName,
       OwnerId: _clipboardNote!.OwnerId,
-      FolderId: _clipboardNote!.FolderId,
+      FolderId: folderId,
       CreationDate: DateTime.now(),
       ModificationDate: DateTime.now(),
       Content: _clipboardNote!.Content,
@@ -75,13 +87,6 @@ class ClipboardManager {
     );
 
     await db.child('Note').child(newNoteId.toString()).set(newNote.toJson());
-
-    if (_isCutOperation) {
-      await db
-          .child('Note')
-          .child(_clipboardNote!.Id.toString())
-          .update({'Status': false});
-    }
 
     _clipboardNote = null;
     _isCutOperation = false;
@@ -95,11 +100,23 @@ class ClipboardManager {
     _isFolderClipboard = true;
   }
 
-  static void cutFolder(Folder folder) {
+  static Future<void> cutFolder(Folder folder, DatabaseReference db) async {
     _clipboardFolder = folder;
     _clipboardNote = null;
     _isCutOperation = true;
     _isFolderClipboard = true;
+
+    // Ustaw Status=false aby zniknął z widoku
+    final foldersSnap = await db.child('Folder').get();
+    if (foldersSnap.exists && foldersSnap.value is Map) {
+      final data = foldersSnap.value as Map;
+      for (var entry in data.entries) {
+        if (entry.value is Map && entry.value['Id'] == folder.Id) {
+          await db.child('Folder').child(entry.key).update({'Status': false});
+          break;
+        }
+      }
+    }
   }
 
   static Future<void> pasteFolder(DatabaseReference db, int? targetParentFolderId) async {
@@ -151,14 +168,8 @@ class ClipboardManager {
 
     await db.child('Folder').child(newFolderId.toString()).set(newFolder.toJson());
 
-    if (_isCutOperation) {
-      await db
-          .child('Folder')
-          .child(_clipboardFolder!.Id.toString())
-          .update({'Status': false});
-    }
-
     _clipboardFolder = null;
     _isCutOperation = false;
   }
 }
+

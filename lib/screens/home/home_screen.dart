@@ -14,6 +14,10 @@ import '/screens/home/new_note.dart';
 import '/widgets/drawer.dart';
 import 'package:intl/intl.dart';
 
+
+import '/utils/download_helper.dart';
+import '/utils/zip_utils.dart';
+
 class MyHomePage extends StatefulWidget {
   final String title;
   final int? folderId;
@@ -42,9 +46,12 @@ class _MyHomePageState extends State<MyHomePage> {
     User? user = await AuthService.getCurrentUser();
     if (user == null) return;
 
-    final userId = user.Login; // userId jest Stringiem (np. "pawel")
+    final userId = user.Login;
     setState(() {
-      _login = user.Login;
+      _login = userId;
+      _currentFolder = null;
+      _folders = [];
+      _notes = [];
     });
 
     final foldersSnap = await _db.child('Folder').get();
@@ -60,8 +67,16 @@ class _MyHomePageState extends State<MyHomePage> {
         if (item is Map) {
           try {
             final folder = Folder.fromJson(Map<String, dynamic>.from(item));
-            // Porównanie OwnerId jako String
-            if (folder.OwnerId == userId && // Zakładamy, że OwnerId jest Stringiem
+
+            // Widok kosza
+            if (widget.folderId == -1) {
+              if (folder.OwnerId == userId && folder.Status == false) {
+                folders.add(folder);
+              }
+            }
+            // Widok normalny
+            else if (folder.OwnerId == userId &&
+                folder.Status == true &&
                 (widget.folderId == null
                     ? folder.ParentFolderId == 0
                     : folder.ParentFolderId == widget.folderId)) {
@@ -74,8 +89,11 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     }
 
-    // Wczytywanie bieżącego folderu
-    if (widget.folderId != null && foldersSnap.exists && foldersSnap.value is Map) {
+    // Wczytywanie bieżącego folderu (nagłówek)
+    if (widget.folderId != null &&
+        widget.folderId != -1 &&
+        foldersSnap.exists &&
+        foldersSnap.value is Map) {
       final data = foldersSnap.value as Map;
       for (var item in data.values) {
         if (item is Map) {
@@ -92,29 +110,29 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     }
 
-    // Dodanie domyślnych folderów
+    // Dodanie folderów domyślnych (Udostępnione, Kosz)
     if (widget.folderId == null || widget.folderId == 0) {
-      final defaultOwnerId = _login ?? 'default_user'; // Unikamy null, używamy wartości domyślnej
-      final shared = Folder(
-        Id: -2,
-        Name: "Udostępnione",
-        OwnerId: defaultOwnerId,
-        ParentFolderId: 0,
-        CreationDate: DateTime.now(),
-        ModificationDate: DateTime.now(),
-        Status: true,
-      );
-      folders.add(shared);
-      final deleted = Folder(
-        Id: -1,
-        Name: "Kosz",
-        OwnerId: defaultOwnerId,
-        ParentFolderId: 0,
-        CreationDate: DateTime.now(),
-        ModificationDate: DateTime.now(),
-        Status: true,
-      );
-      folders.add(deleted);
+      final defaultOwnerId = _login ?? 'default_user';
+      folders.addAll([
+        Folder(
+          Id: -2,
+          Name: "Udostępnione",
+          OwnerId: defaultOwnerId,
+          ParentFolderId: 0,
+          CreationDate: DateTime.now(),
+          ModificationDate: DateTime.now(),
+          Status: true,
+        ),
+        Folder(
+          Id: -1,
+          Name: "Kosz",
+          OwnerId: defaultOwnerId,
+          ParentFolderId: 0,
+          CreationDate: DateTime.now(),
+          ModificationDate: DateTime.now(),
+          Status: true,
+        ),
+      ]);
     }
 
     // Wczytywanie notatek
@@ -124,12 +142,19 @@ class _MyHomePageState extends State<MyHomePage> {
         if (item is Map) {
           try {
             final note = Note.fromJson(Map<String, dynamic>.from(item));
-            // Porównanie OwnerId jako String
-            if (note.OwnerId == userId && note.Status == true &&
-                (widget.folderId == null
-                    ? note.FolderId == 0 || note.FolderId == null
-                    : note.FolderId == widget.folderId)) {
-              notes.add(note);
+
+            if (note.OwnerId == userId) {
+              if (widget.folderId == -1 && note.Status == false) {
+                // Notatki w koszu
+                notes.add(note);
+              } else if (widget.folderId != -1 &&
+                  note.Status == true &&
+                  (widget.folderId == null
+                      ? note.FolderId == 0 || note.FolderId == null
+                      : note.FolderId == widget.folderId)) {
+                // Notatki normalne
+                notes.add(note);
+              }
             }
           } catch (e) {
             print('Błąd parsowania notatki: $e');
@@ -143,6 +168,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _notes = notes;
     });
   }
+
 
   Future<List<User>> _fetchActiveUsers() async {
     final usersRef = _db.child('Users');
@@ -435,8 +461,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
               if (nameController.text.trim().isEmpty || _login == null) return;
 
-              final newFolderRef = _db.child('Folder').push();
               final newId = DateTime.now().millisecondsSinceEpoch;
+              final newFolderRef = _db.child('Folder').child(newId.toString());
 
               final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
               final now = formatter.format(DateTime.now());
@@ -452,6 +478,7 @@ class _MyHomePageState extends State<MyHomePage> {
               };
 
               await newFolderRef.set(folder);
+
               _loadData();
             },
           ),
@@ -478,20 +505,16 @@ class _MyHomePageState extends State<MyHomePage> {
     );
 
     if (newName != null && newName.trim().isNotEmpty) {
-      final updatedFolder = Folder(
-        Id: folder.Id,
-        Name: newName.trim(),
-        OwnerId: folder.OwnerId,
-        ParentFolderId: folder.ParentFolderId,
-        CreationDate: folder.CreationDate,
-        ModificationDate: DateTime.now(),
-        Status: folder.Status,
-      );
-      await _db.child('Folder/${folder.Id}').set(updatedFolder.toJson());
-      print('Folder zaktualizowany: ${folder.Name} -> $newName');
-      _loadData();
+      await _db.child('Folder/${folder.Id}').update({
+        'Name': newName.trim(),
+        'ModificationDate': DateTime.now().toIso8601String(),
+      });
+
+      print('Zmieniono nazwę folderu: ${folder.Name} -> $newName');
+      _loadData(); // Odśwież dane
     }
   }
+
 
   void _copyFolder(Folder folder) {
     ClipboardManager.copyFolder(folder);
@@ -500,7 +523,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _cutFolder(Folder folder) {
-    ClipboardManager.cutFolder(folder);
+    ClipboardManager.cutFolder(folder, _db);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Folder wycięty')));
     print('Wytnięto folder: ${folder.Name}');
   }
@@ -517,6 +540,45 @@ class _MyHomePageState extends State<MyHomePage> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Folder usunięty')));
     print('Usunięto folder: ${folder.Name}');
     _loadData();
+  }
+
+  Future<List<Note>> getAllNotesRecursive(int folderId) async {
+    final List<Note> allNotes = [];
+
+    // Pobierz wszystkie notatki
+    final notesSnap = await _db.child('Note').get();
+    if (notesSnap.exists && notesSnap.value is Map) {
+      final data = notesSnap.value as Map;
+      data.forEach((key, value) {
+        if (value is Map &&
+            value['FolderId'] == folderId &&
+            value['Status'] == true) {
+          allNotes.add(Note.fromJson(Map<String, dynamic>.from(value)));
+        }
+      });
+    }
+
+    // Pobierz wszystkie foldery
+    final foldersSnap = await _db.child('Folder').get();
+    if (foldersSnap.exists && foldersSnap.value is Map) {
+      final folderData = foldersSnap.value as Map;
+      for (var item in folderData.values) {
+        if (item is Map &&
+            item['ParentFolderId'] == folderId &&
+            item['Status'] == true) {
+          final subfolderId = item['Id'] as int;
+          final childNotes = await getAllNotesRecursive(subfolderId);
+          allNotes.addAll(childNotes);
+        }
+      }
+    }
+
+    return allNotes;
+  }
+
+  Future<void> downloadFolderAsZip(Folder folder, List<Note> notes) async {
+    final zipBytes = createZipInMemory(folder, notes);
+    await saveZipFile(zipBytes, '${folder.Name}.zip');
   }
 
   void _logout() async {
@@ -606,14 +668,25 @@ class _MyHomePageState extends State<MyHomePage> {
               onSelected: (value) async {
                 if (value == 'delete') {
                   _deleteFolder(f);
+                } else if (value == 'download') {
+                  final notes = await getAllNotesRecursive(f.Id);
+                  await downloadFolderAsZip(f, notes);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Folder pobrany jako ZIP')),
+                  );
                 } else if (value == 'edit') {
                   _editFolderName(f);
                 } else if (value == 'copy') {
                   _copyFolder(f);
                 } else if (value == 'cut') {
                   _cutFolder(f);
+                  await _loadData();
                 } else if (value == 'paste') {
-                  await _pasteFolder(f.Id);
+                  await ClipboardManager.pasteFolder(_db, f.Id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Folder wklejony jako nowy')),
+                  );
+                  await _loadData();
                 }
               },
               itemBuilder: (context) => [
@@ -637,6 +710,17 @@ class _MyHomePageState extends State<MyHomePage> {
                     ],
                   ),
                 ),
+                const PopupMenuItem(
+                  value: 'download',
+                  child: Row(
+                    children: [
+                      Icon(Icons.download, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('Pobierz jako ZIP'),
+                    ],
+                  ),
+                ),
+
                 const PopupMenuItem(
                   value: 'copy',
                   child: Row(
@@ -696,15 +780,16 @@ class _MyHomePageState extends State<MyHomePage> {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notatka skopiowana')),
                   );
                 } else if (value == 'cut') {
-                  ClipboardManager.cut(n);
+                  ClipboardManager.cut(n, _db);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notatka wycięta')),
                   );
+                  await _loadData();
                 } else if (value == 'paste') {
-                  await ClipboardManager.paste(_db);
+                  await ClipboardManager.paste(_db, widget.folderId ?? 0);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Notatka wklejona jako nowa')),
                   );
-                  _loadData(); // odświeżenie widoku
+                  await _loadData();
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -784,6 +869,21 @@ class _MyHomePageState extends State<MyHomePage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          if (ClipboardManager.hasData()) ...[
+            FloatingActionButton(
+              heroTag: 'pasteNoteBtn',
+              onPressed: () async {
+                await ClipboardManager.paste(_db, widget.folderId ?? 0);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Notatka wklejona')),
+                );
+                _loadData();
+              },
+              tooltip: 'Wklej notatkę',
+              child: const Icon(Icons.paste),
+            ),
+            const SizedBox(height: 12),
+          ],
           FloatingActionButton(
             heroTag: 'folderBtn',
             onPressed: _newFolder,
@@ -799,6 +899,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ],
       ),
+
     );
   }
 }
