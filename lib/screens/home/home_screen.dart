@@ -336,51 +336,99 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _addCollaborator(Note note) async {
     List<User> users = await _fetchActiveUsers();
-    User? selectedUser;
+    List<MapEntry<String, Collaborator>> existingCollaborators = [];
 
-    if (users.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Brak aktywnych użytkowników')),
-      );
-      return;
+    final collabRef = _db.child('Collaborators');
+    final collabSnap = await collabRef.get();
+
+    if (collabSnap.exists && collabSnap.value is Map) {
+      final data = Map<String, dynamic>.from(collabSnap.value as Map);
+      existingCollaborators = data.entries
+          .where((entry) =>
+      entry.value is Map &&
+          entry.value['NoteId'] == note.Id)
+          .map((entry) => MapEntry(
+        entry.key,
+        Collaborator.fromJson(Map<String, dynamic>.from(entry.value)),
+      ))
+          .toList();
     }
+
+    User? selectedUser;
+    String? currentLogin = _login;
 
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) => AlertDialog(
-            title: const Text('Dodaj współtwórcę'),
-            content: DropdownButtonFormField<User>(
-              items: users.map((user) {
-                return DropdownMenuItem<User>(
-                  value: user,
-                  child: Text('${user.Name} ${user.Surname} (${user.Login})'),
-                );
-              }).toList(),
-              onChanged: (User? user) {
-                setState(() {
-                  selectedUser = user;
-                });
-              },
-              hint: const Text('Wybierz użytkownika'),
+            title: const Text('Współtwórcy'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<User>(
+                  items: users
+                      .where((user) => user.Login != currentLogin)
+                      .map((user) => DropdownMenuItem<User>(
+                    value: user,
+                    child: Text('${user.Name} ${user.Surname} (${user.Login})'),
+                  ))
+                      .toList(),
+                  onChanged: (User? user) {
+                    setState(() {
+                      selectedUser = user;
+                    });
+                  },
+                  hint: const Text('Dodaj nowego współtwórcę'),
+                ),
+                const SizedBox(height: 20),
+                const Text('Aktualni współtwórcy:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                for (var entry in existingCollaborators)
+                  ListTile(
+                    title: Text(entry.value.CollaboratorId),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () async {
+                        await _db.child('Collaborators').child(entry.key).remove();
+                        setState(() {
+                          existingCollaborators.remove(entry);
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Usunięto współtwórcę ${entry.value.CollaboratorId}')),
+                        );
+                      },
+                    ),
+                  ),
+              ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Anuluj'),
+                child: const Text('Zamknij'),
               ),
               ElevatedButton(
                 onPressed: selectedUser == null
                     ? null
                     : () async {
-                  final collabRef = _db.child('Collaborators');
-                  final snapshot = await collabRef.get();
+                  final alreadyExists = existingCollaborators.any(
+                          (entry) => entry.value.CollaboratorId == selectedUser!.Login);
+
+                  if (alreadyExists) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Ten użytkownik już ma dostęp')),
+                    );
+                    return;
+                  }
+
+                  final snapshot = await _db.child('Collaborators').get();
                   int newId = 1;
 
                   if (snapshot.exists && snapshot.value is Map) {
-                    final data = Map<String, dynamic>.from(snapshot.value as Map);
-                    final ids = data.values.map((e) => e['Id'] as int).toList();
+                    final ids = (snapshot.value as Map).values
+                        .where((e) => e is Map && e['Id'] != null)
+                        .map((e) => e['Id'] as int)
+                        .toList();
                     newId = (ids.isNotEmpty ? ids.reduce((a, b) => a > b ? a : b) + 1 : 1);
                   }
 
@@ -390,7 +438,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     NoteId: note.Id,
                   );
 
-                  await collabRef.push().set(newCollab.toJson());
+                  await _db.child('Collaborators').push().set(newCollab.toJson());
 
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -405,7 +453,6 @@ class _MyHomePageState extends State<MyHomePage> {
       },
     );
   }
-
 
   Future<void> _deleteNote(int noteId) async {
     final noteRef = _db.child('Note');
@@ -664,29 +711,26 @@ class _MyHomePageState extends State<MyHomePage> {
                 : f.Id == -2
                 ? _openSpecialFolder("shared")
                 : _openFolder(f.Id),
-            trailing: PopupMenuButton<String>(
+            trailing: (f.Id == -1 || f.Id == -2)
+                ? null
+                : PopupMenuButton<String>(
               onSelected: (value) async {
                 if (value == 'delete') {
                   _deleteFolder(f);
-                } else if (value == 'download') {
-                  final notes = await getAllNotesRecursive(f.Id);
-                  await downloadFolderAsZip(f, notes);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Folder pobrany jako ZIP')),
-                  );
                 } else if (value == 'edit') {
                   _editFolderName(f);
                 } else if (value == 'copy') {
                   _copyFolder(f);
                 } else if (value == 'cut') {
                   _cutFolder(f);
-                  await _loadData();
                 } else if (value == 'paste') {
-                  await ClipboardManager.pasteFolder(_db, f.Id);
+                  await _pasteFolder(f.Id);
+                } else if (value == 'download') {
+                  final notes = await getAllNotesRecursive(f.Id);
+                  await downloadFolderAsZip(f, notes);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Folder wklejony jako nowy')),
+                    const SnackBar(content: Text('Folder pobrany jako ZIP')),
                   );
-                  await _loadData();
                 }
               },
               itemBuilder: (context) => [
@@ -711,21 +755,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
                 const PopupMenuItem(
-                  value: 'download',
-                  child: Row(
-                    children: [
-                      Icon(Icons.download, color: Colors.blue),
-                      SizedBox(width: 8),
-                      Text('Pobierz jako ZIP'),
-                    ],
-                  ),
-                ),
-
-                const PopupMenuItem(
                   value: 'copy',
                   child: Row(
                     children: [
-                      Icon(Icons.copy, color: Colors.yellow), // Poprawiono na Icons.copy
+                      Icon(Icons.copy, color: Colors.yellow),
                       SizedBox(width: 8),
                       Text('Kopiuj'),
                     ],
@@ -746,12 +779,22 @@ class _MyHomePageState extends State<MyHomePage> {
                     value: 'paste',
                     child: Row(
                       children: [
-                        Icon(Icons.paste, color: Colors.purple), // Poprawiono na Icons.paste
+                        Icon(Icons.paste, color: Colors.purple),
                         SizedBox(width: 8),
                         Text('Wklej'),
                       ],
                     ),
                   ),
+                const PopupMenuItem(
+                  value: 'download',
+                  child: Row(
+                    children: [
+                      Icon(Icons.download, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('Pobierz jako ZIP'),
+                    ],
+                  ),
+                ),
               ],
             ),
           )),
