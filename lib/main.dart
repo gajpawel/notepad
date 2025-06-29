@@ -4,11 +4,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 const FirebaseOptions firebaseOptions = FirebaseOptions(
   apiKey: "AIzaSyA7TvPSmjOk3qZirF_u3dXVCt7a0rHTyDs",
   authDomain: "notepaddb-5e65b.firebaseapp.com",
-  databaseURL: "https://notepaddb-5e65b-default-rtdb.europe-west1.firebasedatabase.app",
+  databaseURL:
+      "https://notepaddb-5e65b-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "notepaddb-5e65b",
   storageBucket: "notepaddb-5e65b.firebasestorage.app",
   messagingSenderId: "688158558009",
@@ -19,9 +21,7 @@ const FirebaseOptions firebaseOptions = FirebaseOptions(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await Firebase.initializeApp(
-      options: firebaseOptions,
-    );
+    await Firebase.initializeApp(options: firebaseOptions);
   } catch (e) {
     print('Błąd inicjalizacji Firebase: $e');
   }
@@ -45,9 +45,7 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
         FlutterQuillLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('pl'),
-      ],
+      supportedLocales: const [Locale('pl')],
       home: const AuthPage(),
     );
   }

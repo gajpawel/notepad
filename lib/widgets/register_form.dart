@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class RegisterForm extends StatelessWidget {
   final TextEditingController loginController;
+  final TextEditingController emailController;
   final TextEditingController nameController;
   final TextEditingController surnameController;
   final TextEditingController passwordController;
@@ -10,6 +11,7 @@ class RegisterForm extends StatelessWidget {
   const RegisterForm({
     Key? key,
     required this.loginController,
+    required this.emailController,
     required this.nameController,
     required this.surnameController,
     required this.passwordController,
@@ -27,8 +29,26 @@ class RegisterForm extends StatelessWidget {
             border: OutlineInputBorder(),
           ),
           validator: (value) {
-            if (value!.isEmpty) return 'Podaj nazwę użytkownika';
-            if (value.length < 6) return 'Minimum 6 znaków';
+            if (value == null || value.isEmpty) {
+              return 'Podaj nazwę użytkownika';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: emailController,
+          decoration: const InputDecoration(
+            labelText: 'E-mail',
+            border: OutlineInputBorder(),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Podaj e-mail';
+            }
+            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              return 'Nieprawidłowy format e-maila';
+            }
             return null;
           },
         ),
@@ -40,7 +60,9 @@ class RegisterForm extends StatelessWidget {
             border: OutlineInputBorder(),
           ),
           validator: (value) {
-            if (value!.isEmpty) return 'Podaj imię';
+            if (value == null || value.isEmpty) {
+              return 'Podaj imię';
+            }
             return null;
           },
         ),
@@ -52,7 +74,9 @@ class RegisterForm extends StatelessWidget {
             border: OutlineInputBorder(),
           ),
           validator: (value) {
-            if (value!.isEmpty) return 'Podaj nazwisko';
+            if (value == null || value.isEmpty) {
+              return 'Podaj nazwisko';
+            }
             return null;
           },
         ),
@@ -65,8 +89,9 @@ class RegisterForm extends StatelessWidget {
             border: OutlineInputBorder(),
           ),
           validator: (value) {
-            if (value!.isEmpty) return 'Podaj hasło';
-            if (value.length < 6) return 'Minimum 6 znaków';
+            if (value == null || value.isEmpty) {
+              return 'Podaj hasło';
+            }
             return null;
           },
         ),
@@ -78,7 +103,12 @@ class RegisterForm extends StatelessWidget {
             labelText: 'Potwierdź hasło',
             border: OutlineInputBorder(),
           ),
-          validator: (value) => value!.isEmpty ? 'Potwierdź hasło' : null,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Potwierdź hasło';
+            }
+            return null;
+          },
         ),
       ],
     );
