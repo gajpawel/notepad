@@ -108,7 +108,7 @@ Ten projekt jest licencjonowany na licencji MIT - szczegóły w pliku [LICENSE](
 
 ## 📞 Autorzy
 
-- **Autorzy**: Bartosz Bazan, Paweł Gaj, Aleksandra Nizio, Jakub Różycki, Mateusz Sarwa
+- **Autorzy**: Bartosz Bazan, Paweł Gaj, Aleksandra Nizio, Jakub Różycki, Jakub Haberek, Mateusz Sarwa
 
 
 ## 🔄 Plan rozwoju
