@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'dart:io' show File;
 import 'package:Noteable/services/ocr/ocr_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../speech_recognition_screen.dart';
 
 class OCRPage extends StatefulWidget {
   const OCRPage({super.key});
@@ -75,19 +74,7 @@ class _OCRPageState extends State<OCRPage> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  // NOWA FUNKCJA - przejście do Speech Recognition
-  void _goToSpeechRecognition() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const SpeechRecognitionScreen(),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _buildImagePreview() {
@@ -102,20 +89,19 @@ class _OCRPageState extends State<OCRPage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child:
-            kIsWeb
-                ? Image.network(
-                  _selectedImagePath!,
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.contain,
-                )
-                : Image.file(
-                  File(_selectedImagePath!),
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.contain,
-                ),
+        child: kIsWeb
+            ? Image.network(
+                _selectedImagePath!,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.contain,
+              )
+            : Image.file(
+                File(_selectedImagePath!),
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.contain,
+              ),
       ),
     );
   }
@@ -178,22 +164,17 @@ class _OCRPageState extends State<OCRPage> {
             const SizedBox(height: 16),
             ExpansionTile(
               title: const Text('Szczegóły rozpoznawania'),
-              children:
-                  _ocrResults.map((result) {
-                    final confidence = ((result['confidence'] as double) * 100)
-                        .toStringAsFixed(1);
-                    return ListTile(
-                      leading: Icon(
-                        Icons.text_snippet,
-                        color:
-                            result['confidence'] > 0.7
-                                ? Colors.green
-                                : Colors.orange,
-                      ),
-                      title: Text(result['text']),
-                      subtitle: Text('Pewność: $confidence%'),
-                    );
-                  }).toList(),
+              children: _ocrResults.map((result) {
+                final confidence = ((result['confidence'] as double) * 100).toStringAsFixed(1);
+                return ListTile(
+                  leading: Icon(
+                    Icons.text_snippet,
+                    color: result['confidence'] > 0.7 ? Colors.green : Colors.orange,
+                  ),
+                  title: Text(result['text']),
+                  subtitle: Text('Pewność: $confidence%'),
+                );
+              }).toList(),
             ),
           ] else
             const Text(
@@ -213,16 +194,10 @@ class _OCRPageState extends State<OCRPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rozpoznawanie tekstu'),
+        title: const Text('Rozpoznawanie tekstu z obrazu'),
         backgroundColor: Colors.blue.shade600,
         foregroundColor: Colors.white,
         actions: [
-          // NOWY PRZYCISK - Speech Recognition w AppBar
-          IconButton(
-            icon: const Icon(Icons.mic),
-            onPressed: _goToSpeechRecognition,
-            tooltip: 'Rozpoznawanie mowy',
-          ),
           if (_recognizedText.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.clear),
@@ -250,7 +225,7 @@ class _OCRPageState extends State<OCRPage> {
                       Icon(Icons.info_outline, color: Colors.blue.shade600),
                       const SizedBox(width: 8),
                       const Text(
-                        'Jak używać',
+                        'Jak używać OCR',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -263,9 +238,9 @@ class _OCRPageState extends State<OCRPage> {
                     '📷 OCR - Rozpoznawanie tekstu z obrazu:\n'
                     '1. Kliknij "Wybierz obraz i uruchom OCR"\n'
                     '2. Wybierz obraz z dysku\n'
-                    '3. Poczekaj na przetworzenie obrazu\n\n'
-                    '🎤 Speech - Rozpoznawanie mowy:\n'
-                    '• Kliknij ikonę mikrofonu w prawym górnym rogu',
+                    '3. Poczekaj na przetworzenie obrazu\n'
+                    '4. Skopiuj rozpoznany tekst\n\n'
+                    '💡 Najlepiej działają obrazy z wyraźnym, kontrastowym tekstem.',
                     style: TextStyle(fontSize: 14),
                   ),
                 ],
@@ -273,56 +248,31 @@ class _OCRPageState extends State<OCRPage> {
             ),
             const SizedBox(height: 24),
             
-            // NOWA SEKCJA - Wybór metody rozpoznawania
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : _pickImageAndRun,
-                    icon:
-                        _isProcessing
-                            ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                            : const Icon(Icons.image_search, size: 24),
-                    label: Text(
-                      _isProcessing
-                          ? 'Przetwarzanie...'
-                          : 'OCR z obrazu',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
-                    ),
+            // TYLKO PRZYCISK OCR
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isProcessing ? null : _pickImageAndRun,
+                icon: _isProcessing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.image_search, size: 24),
+                label: Text(
+                  _isProcessing ? 'Przetwarzanie...' : 'Wybierz obraz i uruchom OCR',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _goToSpeechRecognition,
-                    icon: const Icon(Icons.mic, size: 24),
-                    label: const Text(
-                      'Rozpoznaj mowę',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
             
             _buildImagePreview(),

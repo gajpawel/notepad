@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'ocr_page.dart';
+import '../speech_recognition_screen.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart';
 
@@ -149,12 +150,35 @@ class _NewNoteState extends State<NewNote> {
     }
   }
 
+  // FUNKCJA DO OTWIERANIA OCR (TYLKO ROZPOZNAWANIE OBRAZU)
   Future<void> _openOCRPage() async {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const OCRPage()),
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const OCRPage()),
+    );
+  }
+
+  // NOWA FUNKCJA DO OTWIERANIA ROZPOZNAWANIA MOWY
+  Future<void> _openSpeechRecognition() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (context) => const SpeechRecognitionScreen()),
+    );
+    
+    // Jeśli użytkownik wrócił z tekstem, dodaj go do notatki
+    if (result != null && result.isNotEmpty) {
+      final currentText = _quillController.document.toPlainText();
+      final newText = currentText.isEmpty ? result : '$currentText\n$result';
+      
+      // Utwórz nowy dokument z dodanym tekstem
+      final delta = Delta()..insert('$newText\n');
+      _quillController.document = quill.Document.fromDelta(delta);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tekst z rozpoznawania mowy został dodany')),
       );
     }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +191,14 @@ class _NewNoteState extends State<NewNote> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notatka'),
-        // usuń actions z AppBar
+        actions: [
+          // NOWA IKONA MIKROFONU W APPBAR
+          IconButton(
+            icon: const Icon(Icons.mic),
+            onPressed: _openSpeechRecognition,
+            tooltip: 'Rozpoznawanie mowy',
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -200,12 +231,13 @@ class _NewNoteState extends State<NewNote> {
                   icon: const Icon(Icons.save),
                   label: const Text('Zapisz'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green, // kolor tła
-                    foregroundColor: Colors.white, // kolor tekstu i ikony
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   ),
                 ),
                 const SizedBox(width: 12),
+                // PRZYCISK OCR (TYLKO OBRAZ)
                 ElevatedButton.icon(
                   onPressed: _openOCRPage,
                   icon: const Icon(Icons.camera_alt),
@@ -216,6 +248,18 @@ class _NewNoteState extends State<NewNote> {
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   ),
                 ),
+                const SizedBox(width: 12),
+                // NOWY PRZYCISK MIKROFONU (TYLKO MOWA)
+                ElevatedButton.icon(
+                  onPressed: _openSpeechRecognition,
+                  icon: const Icon(Icons.mic),
+                  label: const Text('Mowa'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                ),
               ],
             ),
           ],
@@ -224,5 +268,3 @@ class _NewNoteState extends State<NewNote> {
     );
   }
 }
-
-

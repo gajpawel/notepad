@@ -260,6 +260,11 @@ class ProcessSpeechService {
     }
   }
 
+  /// Test połączenia - sprawdź czy Python i script działają
+  Future<bool> testConnection() async {
+    return await testPythonScript();
+  }
+
   /// Zwolnij zasoby
   void dispose() {
     _isListening = false;
