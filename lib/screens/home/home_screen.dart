@@ -168,16 +168,33 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<List<User>> _fetchActiveUsers() async {
-    final usersRef = _db.child('Users');
-    final snapshot = await usersRef.get();
+    try {
+      final usersRef = _db.child('Users');
+      final snapshot = await usersRef.get();
 
-    if (snapshot.exists) {
-      final Map data = snapshot.value as Map;
-      return data.values
-          .map((e) => User.fromJson(Map<String, dynamic>.from(e)))
-          .where((u) => u.Status == true)
-          .toList();
-    } else {
+      if (snapshot.exists && snapshot.value is Map) {
+        final Map data = snapshot.value as Map;
+        List<User> users = [];
+        
+        for (var userValue in data.values) {
+          if (userValue is Map) {
+            try {
+              final user = User.fromJson(Map<String, dynamic>.from(userValue));
+              if (user.Status) {
+                users.add(user);
+              }
+            } catch (e) {
+              print('Błąd parsowania użytkownika: $e');
+            }
+          }
+        }
+        
+        return users;
+      } else {
+        return [];
+      }
+    } catch (e) {
+      print('Błąd w _fetchActiveUsers: $e');
       return [];
     }
   }
@@ -229,7 +246,7 @@ class _MyHomePageState extends State<MyHomePage> {
             actions: [
               TextButton(
                 child: const Text('Anuluj'),
-                onPressed: () => Navigator.pop(context, false), // zwróć false
+                onPressed: () => Navigator.pop(context, false),
               ),
               TextButton(
                 child: const Text('Utwórz'),
@@ -257,14 +274,13 @@ class _MyHomePageState extends State<MyHomePage> {
                   await newNoteRef.set(note);
                   _loadData();
 
-                  Navigator.pop(context, true); // zwróć true
+                  Navigator.pop(context, true);
                 },
               ),
             ],
           ),
     );
 
-    // Przejdź do nowej notatki tylko jeśli użytkownik kliknął "Utwórz"
     if (shouldCreate == true) {
       Navigator.push(
         context,
@@ -288,7 +304,7 @@ class _MyHomePageState extends State<MyHomePage> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(); // zamknij dialog
+                Navigator.of(context).pop();
               },
               child: const Text('Anuluj'),
             ),
@@ -321,168 +337,449 @@ class _MyHomePageState extends State<MyHomePage> {
       },
     );
   }
+void _addCollaborator(Note note) async {
+  try {
+    print('DEBUG: === ROZPOCZYNAM _addCollaborator ===');
+    print('DEBUG: Note ID: ${note.Id}');
+    print('DEBUG: Note Name: ${note.Name}');
+    print('DEBUG: Current login: $_login');
 
-  void _addCollaborator(Note note) async {
-    List<User> users = await _fetchActiveUsers();
+    List<User> users = [];
     List<MapEntry<String, Collaborator>> existingCollaborators = [];
+    TextEditingController emailController = TextEditingController();
+    User? selectedUser;
+    User? foundUserByEmail;
+    String currentLogin = _login ?? '';
 
-    final collabRef = _db.child('Collaborators');
-    final collabSnap = await collabRef.get();
-
-    if (collabSnap.exists && collabSnap.value is Map) {
-      final data = Map<String, dynamic>.from(collabSnap.value as Map);
-      existingCollaborators =
-          data.entries
-              .where(
-                (entry) =>
-                    entry.value is Map && entry.value['NoteId'] == note.Id,
-              )
-              .map(
-                (entry) => MapEntry(
-                  entry.key,
-                  Collaborator.fromJson(Map<String, dynamic>.from(entry.value)),
-                ),
-              )
-              .toList();
+    // Pobierz użytkowników z bardzo szczegółowym debugowaniem
+    try {
+      print('DEBUG: Pobieram użytkowników...');
+      final usersRef = _db.child('Users');
+      final usersSnapshot = await usersRef.get();
+      
+      if (usersSnapshot.exists && usersSnapshot.value is Map) {
+        final usersData = usersSnapshot.value as Map;
+        print('DEBUG: Znaleziono ${usersData.length} rekordów użytkowników');
+        
+        for (var entry in usersData.entries) {
+          try {
+            print('DEBUG: Przetwarzam użytkownika: klucz=${entry.key}');
+            
+            if (entry.value is Map) {
+              final userMap = Map<String, dynamic>.from(entry.value);
+              print('DEBUG: Dane użytkownika: $userMap');
+              
+              // Sprawdź każde pole osobno
+              final uid = userMap['Uid'];
+              final login = userMap['Login'];
+              final email = userMap['Email'];
+              final name = userMap['Name'];
+              final surname = userMap['Surname'];
+              final status = userMap['Status'];
+              final theme = userMap['Theme'];
+              
+              print('DEBUG: Uid=$uid, Login=$login, Email=$email, Name=$name, Surname=$surname, Status=$status, Theme=$theme');
+              
+              // Bezpieczne tworzenie użytkownika
+              if (login != null && login.toString().isNotEmpty) {
+                final user = User(
+                  Uid: uid?.toString() ?? '',
+                  Login: login.toString(),
+                  Email: email?.toString() ?? '',
+                  Name: name?.toString() ?? '',
+                  Surname: surname?.toString() ?? '',
+                  Status: status == true,
+                  Theme: theme == true,
+                );
+                
+                if (user.Status) {
+                  users.add(user);
+                  print('DEBUG: Dodano użytkownika: ${user.Login}');
+                }
+              } else {
+                print('DEBUG: Pominięto użytkownika z pustym loginem');
+              }
+            }
+          } catch (e) {
+            print('DEBUG: Błąd parsowania użytkownika: $e');
+          }
+        }
+      }
+      
+      print('DEBUG: Łącznie załadowano ${users.length} aktywnych użytkowników');
+    } catch (e) {
+      print('DEBUG: Błąd podczas pobierania użytkowników: $e');
+      throw e;
     }
 
-    User? selectedUser;
-    String? currentLogin = _login;
+    // Pobierz współtwórców z bardzo szczegółowym debugowaniem
+    try {
+      print('DEBUG: Pobieram współtwórców...');
+      final collabRef = _db.child('Collaborators');
+      final collabSnap = await collabRef.get();
+
+      if (collabSnap.exists && collabSnap.value is Map) {
+        final collabData = Map<String, dynamic>.from(collabSnap.value as Map);
+        print('DEBUG: Znaleziono ${collabData.length} rekordów współtwórców');
+        
+        for (var entry in collabData.entries) {
+          try {
+            print('DEBUG: Przetwarzam współtwórcę: klucz=${entry.key}');
+            
+            if (entry.value is Map) {
+              final collabMap = Map<String, dynamic>.from(entry.value);
+              print('DEBUG: Dane współtwórcy: $collabMap');
+              
+              final id = collabMap['Id'];
+              final collaboratorId = collabMap['CollaboratorId'];
+              final noteId = collabMap['NoteId'];
+              
+              print('DEBUG: Id=$id, CollaboratorId=$collaboratorId, NoteId=$noteId');
+              
+              // Sprawdź czy to współtwórca dla tej notatki
+              if (noteId != null && 
+                  (noteId == note.Id || noteId.toString() == note.Id.toString())) {
+                
+                print('DEBUG: To współtwórca dla naszej notatki');
+                
+                // Bardzo bezpieczne tworzenie współtwórcy
+                final collaborator = Collaborator(
+                  Id: id is int ? id : (int.tryParse(id?.toString() ?? '0') ?? 0),
+                  CollaboratorId: collaboratorId?.toString() ?? '',
+                  NoteId: noteId is int ? noteId : (int.tryParse(noteId?.toString() ?? '0') ?? 0),
+                );
+                
+                if (collaborator.CollaboratorId.isNotEmpty) {
+                  existingCollaborators.add(MapEntry(entry.key, collaborator));
+                  print('DEBUG: Dodano współtwórcę: ${collaborator.CollaboratorId}');
+                }
+              }
+            }
+          } catch (e) {
+            print('DEBUG: Błąd parsowania współtwórcy: $e');
+          }
+        }
+      }
+      
+      print('DEBUG: Łącznie załadowano ${existingCollaborators.length} współtwórców');
+    } catch (e) {
+      print('DEBUG: Błąd podczas pobierania współtwórców: $e');
+      throw e;
+    }
+
+    // Funkcja do wyszukiwania użytkownika po e-mailu
+    Future<User?> searchUserByEmail(String email) async {
+      print('DEBUG: Wyszukuję użytkownika po e-mailu: $email');
+      
+      if (email.trim().isEmpty) {
+        print('DEBUG: Pusty e-mail');
+        return null;
+      }
+      
+      try {
+        for (var user in users) {
+          print('DEBUG: Sprawdzam użytkownika: ${user.Login}, email: ${user.Email}');
+          if (user.Email.toLowerCase() == email.toLowerCase()) {
+            print('DEBUG: Znaleziono użytkownika po e-mailu: ${user.Login}');
+            return user;
+          }
+        }
+        print('DEBUG: Nie znaleziono użytkownika po e-mailu');
+      } catch (e) {
+        print('DEBUG: Błąd podczas wyszukiwania po e-mailu: $e');
+      }
+      return null;
+    }
+
+    if (!mounted) {
+      print('DEBUG: Widget nie jest mounted, przerywam');
+      return;
+    }
+
+    print('DEBUG: Pokazuję dialog');
 
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder:
-              (context, setState) => AlertDialog(
-                title: const Text('Współtwórcy'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<User>(
-                      items:
-                          users
-                              .where((user) => user.Login != currentLogin)
-                              .map(
-                                (user) => DropdownMenuItem<User>(
-                                  value: user,
-                                  child: Text(
-                                    '${user.Name} ${user.Surname} (${user.Login})',
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                      onChanged: (User? user) {
-                        setState(() {
-                          selectedUser = user;
-                        });
-                      },
-                      hint: const Text('Dodaj nowego współtwórcę'),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Aktualni współtwórcy:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    for (var entry in existingCollaborators)
-                      ListTile(
-                        title: Text(entry.value.CollaboratorId),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () async {
-                            await _db
-                                .child('Collaborators')
-                                .child(entry.key)
-                                .remove();
-                            setState(() {
-                              existingCollaborators.remove(entry);
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Współtwórcy'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Sekcja wyszukiwania po e-mailu
+                  const Text(
+                    'Wyszukaj po e-mailu:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: emailController,
+                          decoration: const InputDecoration(
+                            hintText: 'Wprowadź adres e-mail',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (value) {
+                            setDialogState(() {
+                              foundUserByEmail = null;
                             });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Usunięto współtwórcę ${entry.value.CollaboratorId}',
-                                ),
-                              ),
-                            );
                           },
                         ),
                       ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Zamknij'),
-                  ),
-                  ElevatedButton(
-                    onPressed:
-                        selectedUser == null
-                            ? null
-                            : () async {
-                              final alreadyExists = existingCollaborators.any(
-                                (entry) =>
-                                    entry.value.CollaboratorId ==
-                                    selectedUser!.Login,
-                              );
-
-                              if (alreadyExists) {
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final email = emailController.text.trim();
+                          if (email.isNotEmpty) {
+                            try {
+                              final user = await searchUserByEmail(email);
+                              setDialogState(() {
+                                foundUserByEmail = user;
+                                if (user != null) {
+                                  selectedUser = user;
+                                }
+                              });
+                              
+                              if (user == null && context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text(
-                                      'Ten użytkownik już ma dostęp',
-                                    ),
+                                    content: Text('Nie znaleziono użytkownika o podanym e-mailu'),
                                   ),
                                 );
-                                return;
                               }
-
-                              final snapshot =
-                                  await _db.child('Collaborators').get();
-                              int newId = 1;
-
-                              if (snapshot.exists && snapshot.value is Map) {
-                                final ids =
-                                    (snapshot.value as Map).values
-                                        .where(
-                                          (e) => e is Map && e['Id'] != null,
-                                        )
-                                        .map((e) => e['Id'] as int)
-                                        .toList();
-                                newId =
-                                    (ids.isNotEmpty
-                                        ? ids.reduce((a, b) => a > b ? a : b) +
-                                            1
-                                        : 1);
-                              }
-
-                              final newCollab = Collaborator(
-                                Id: newId,
-                                CollaboratorId: selectedUser!.Login,
-                                NoteId: note.Id,
-                              );
-
-                              await _db
-                                  .child('Collaborators')
-                                  .push()
-                                  .set(newCollab.toJson());
-
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Dodano współtwórcę'),
-                                ),
-                              );
-                            },
-                    child: const Text('Dodaj'),
+                            } catch (e) {
+                              print('DEBUG: Błąd podczas wyszukiwania: $e');
+                            }
+                          }
+                        },
+                        child: const Text('Szukaj'),
+                      ),
+                    ],
                   ),
+                  
+                  if (foundUserByEmail != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.green),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Znaleziono: ${foundUserByEmail!.Name} ${foundUserByEmail!.Surname} (${foundUserByEmail!.Login})',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  
+                  // Alternatywnie: wybierz z listy
+                  const Text(
+                    'Lub wybierz z listy:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<User>(
+                    value: selectedUser,
+                    items: users
+                        .where((user) => 
+                            user.Login != currentLogin && 
+                            user.Login.isNotEmpty)
+                        .map((user) => DropdownMenuItem<User>(
+                              value: user,
+                              child: Text(
+                                '${user.Name} ${user.Surname} (${user.Login})',
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (User? user) {
+                      setDialogState(() {
+                        selectedUser = user;
+                        if (user != null) {
+                          foundUserByEmail = user;
+                          emailController.clear();
+                        }
+                      });
+                    },
+                    hint: const Text('Wybierz użytkownika'),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Aktualni współtwórcy:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (existingCollaborators.isEmpty)
+                    const Text(
+                      'Brak współtwórców',
+                      style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                    )
+                  else
+                    ...existingCollaborators.map((entry) => ListTile(
+                          title: Text(entry.value.CollaboratorId),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () async {
+                              try {
+                                print('DEBUG: Usuwam współtwórcę: ${entry.key}');
+                                await _db
+                                    .child('Collaborators')
+                                    .child(entry.key)
+                                    .remove();
+                                
+                                setDialogState(() {
+                                  existingCollaborators.removeWhere(
+                                    (e) => e.key == entry.key,
+                                  );
+                                });
+                                
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Usunięto współtwórcę ${entry.value.CollaboratorId}',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                print('DEBUG: Błąd podczas usuwania współtwórcy: $e');
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Błąd podczas usuwania współtwórcy'),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        )),
                 ],
               ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Zamknij'),
+              ),
+              ElevatedButton(
+                onPressed: selectedUser == null
+                    ? null
+                    : () async {
+                        try {
+                          print('DEBUG: === DODAJĘ WSPÓŁTWÓRCĘ ===');
+                          print('DEBUG: Wybrany użytkownik: ${selectedUser!.Login}');
+                          
+                          // Sprawdź czy selectedUser ma login
+                          if (selectedUser!.Login.isEmpty) {
+                            print('DEBUG: Pusty login');
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Błąd: Użytkownik nie ma przypisanego loginu'),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          // Sprawdź czy użytkownik już istnieje
+                          final alreadyExists = existingCollaborators.any(
+                            (entry) => entry.value.CollaboratorId == selectedUser!.Login,
+                          );
+
+                          if (alreadyExists) {
+                            print('DEBUG: Użytkownik już istnieje');
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Ten użytkownik już ma dostęp'),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          print('DEBUG: Tworzę nowy rekord współtwórcy');
+
+                          // Użyj push() do stworzenia nowego klucza
+                          final newCollabRef = _db.child('Collaborators').push();
+                          
+                          // Wygeneruj nowe ID
+                          int newId = DateTime.now().millisecondsSinceEpoch;
+
+                          final collaboratorData = {
+                            'Id': newId,
+                            'CollaboratorId': selectedUser!.Login,
+                            'NoteId': note.Id,
+                          };
+
+                          print('DEBUG: Zapisuję dane: $collaboratorData');
+
+                          await newCollabRef.set(collaboratorData);
+                          
+                          print('DEBUG: Zapisano pomyślnie');
+
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Dodano współtwórcę: ${selectedUser!.Login}',
+                                ),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          print('DEBUG: Błąd podczas dodawania współtwórcy: $e');
+                          print('DEBUG: Stack trace: ${StackTrace.current}');
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Błąd podczas dodawania współtwórcy: $e'),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                child: const Text('Dodaj'),
+              ),
+            ],
+          ),
         );
       },
     );
+  } catch (e, stackTrace) {
+    print('DEBUG: === GŁÓWNY BŁĄD W _addCollaborator ===');
+    print('DEBUG: Błąd: $e');
+    print('DEBUG: Stack trace: $stackTrace');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Błąd podczas ładowania współtwórców: $e'),
+        ),
+      );
+    }
   }
-
+}
   Future<void> _deleteNote(int noteId) async {
     final noteRef = _db.child('Note');
     final snapshot = await noteRef.get();
@@ -498,14 +795,11 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     }
 
-    // Odśwież widok
     _loadData();
   }
 
   void _downloadNote(Note note) {
     try {
-      // Jeśli platforma mobilna – wymagany context
-      // Jeśli web – context jest ignorowany
       downloadNote(note, context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -558,7 +852,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   };
 
                   await newFolderRef.set(folder);
-
                   _loadData();
                 },
               ),
@@ -598,7 +891,7 @@ class _MyHomePageState extends State<MyHomePage> {
       });
 
       print('Zmieniono nazwę folderu: ${folder.Name} -> $newName');
-      _loadData(); // Odśwież dane
+      _loadData();
     }
   }
 
@@ -639,7 +932,6 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<List<Note>> getAllNotesRecursive(int folderId) async {
     final List<Note> allNotes = [];
 
-    // Pobierz wszystkie notatki
     final notesSnap = await _db.child('Note').get();
     if (notesSnap.exists && notesSnap.value is Map) {
       final data = notesSnap.value as Map;
@@ -652,7 +944,6 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     }
 
-    // Pobierz wszystkie foldery
     final foldersSnap = await _db.child('Folder').get();
     if (foldersSnap.exists && foldersSnap.value is Map) {
       final folderData = foldersSnap.value as Map;

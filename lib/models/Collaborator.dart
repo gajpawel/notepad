@@ -3,7 +3,11 @@ class Collaborator {
   final String CollaboratorId;
   final int NoteId;
 
-  Collaborator({required this.Id, required this.CollaboratorId, required this.NoteId});
+  Collaborator({
+    required this.Id, 
+    required this.CollaboratorId, 
+    required this.NoteId
+  });
 
   Map<String, dynamic> toJson() => {
     'Id': Id,
@@ -13,9 +17,9 @@ class Collaborator {
 
   factory Collaborator.fromJson(Map<String, dynamic> json) {
     return Collaborator(
-        Id: json['Id'],
-        CollaboratorId: json['CollaboratorId'].toString(),
-        NoteId: json['NoteId'],
+      Id: json['Id'] ?? 0,
+      CollaboratorId: (json['CollaboratorId'] ?? '').toString(),
+      NoteId: json['NoteId'] ?? 0,
     );
   }
 }
