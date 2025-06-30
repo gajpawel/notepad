@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import '../services/process_speech_service.dart';
-import '../services/chrome_speech_service.dart';
 import '../services/android_speech_service.dart';
+
+// Warunkowy import - tylko na Web importuj ChromeSpeechService
+import '../services/chrome_speech_service.dart' if (dart.library.io) '../services/dummy_speech_service.dart';
 
 class SpeechRecognitionScreen extends StatefulWidget {
   const SpeechRecognitionScreen({Key? key}) : super(key: key);
@@ -13,8 +15,11 @@ class SpeechRecognitionScreen extends StatefulWidget {
 
 class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
   final ProcessSpeechService _desktopSpeechService = ProcessSpeechService();
-  final ChromeSpeechService _chromeSpeechService = ChromeSpeechService();
   final AndroidSpeechService _androidSpeechService = AndroidSpeechService();
+  
+  // Chrome service tylko na Web - na Desktop/Android będzie null
+  dynamic _chromeSpeechService;
+  
   final TextEditingController _textController = TextEditingController();
   
   bool _isInitialized = false;
@@ -23,22 +28,40 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
   
   // Określ platformę
   bool _isWebPlatform = kIsWeb;
-  bool _isAndroidPlatform = defaultTargetPlatform == TargetPlatform.android;
-  bool _isDesktopPlatform = !kIsWeb && defaultTargetPlatform != TargetPlatform.android && defaultTargetPlatform != TargetPlatform.iOS;
+  bool _isAndroidPlatform = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool _isDesktopPlatform = !kIsWeb && 
+    defaultTargetPlatform != TargetPlatform.android && 
+    defaultTargetPlatform != TargetPlatform.iOS;
   
   @override
   void initState() {
     super.initState();
+    
+    // Tylko na Web stwórz ChromeSpeechService
+    if (_isWebPlatform) {
+      try {
+        _chromeSpeechService = ChromeSpeechService();
+        debugPrint('✅ ChromeSpeechService utworzony dla Web');
+      } catch (e) {
+        debugPrint('❌ Nie można utworzyć ChromeSpeechService: $e');
+        _chromeSpeechService = null;
+      }
+    } else {
+      debugPrint('🖥️ Platforma nie-Web: ChromeSpeechService pomijany');
+      _chromeSpeechService = null;
+    }
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeSpeech();
     });
   }
 
   Future<void> _initializeSpeech() async {
-    if (_isWebPlatform) {
+    if (_isWebPlatform && _chromeSpeechService != null) {
       // CHROME - Web Speech API
+      debugPrint('🌐 Inicjalizuję Chrome Web Speech API');
       _setupChromeCallbacks();
-      bool initialized = await _chromeSpeechService.initialize();
+      bool initialized = await _chromeSpeechService!.initialize();
       setState(() {
         _isInitialized = initialized;
         if (!initialized) {
@@ -51,6 +74,7 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
       }
     } else if (_isAndroidPlatform) {
       // ANDROID - Native Speech Recognition
+      debugPrint('🤖 Inicjalizuję Android Speech Recognition');
       _setupAndroidCallbacks();
       bool initialized = await _androidSpeechService.initialize();
       setState(() {
@@ -64,13 +88,14 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
         _showSuccessSnackBar('🤖 Android Speech API gotowy!');
       }
     } else {
-      // DESKTOP - Python script
+      // DESKTOP - Python script (Windows/macOS/Linux)
+      debugPrint('🐍 Inicjalizuję Python Speech Recognition');
       _setupDesktopCallbacks();
       bool initialized = await _desktopSpeechService.initialize();
       setState(() {
         _isInitialized = initialized;
         if (!initialized) {
-          _errorMessage = 'Python Speech Recognition nie jest dostępny';
+          _errorMessage = 'Python Speech Recognition nie jest dostępny\nUpewnij się, że masz zainstalowany Python i speech_recognizer.py';
         }
       });
       
@@ -81,29 +106,35 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
   }
 
   void _setupChromeCallbacks() {
-    _chromeSpeechService.onResult = (text) {
-      setState(() {
-        if (_textController.text.isEmpty) {
-          _textController.text = text;
-        } else {
-          _textController.text += ' ' + text;
-        }
-      });
-      _showSuccessSnackBar('✅ Chrome rozpoznał: ${text.length > 20 ? text.substring(0, 20) + "..." : text}');
-    };
+    if (_chromeSpeechService == null) return;
     
-    _chromeSpeechService.onError = (error) {
-      setState(() {
-        _errorMessage = error;
-      });
-      _showErrorSnackBar(error);
-    };
-    
-    _chromeSpeechService.onListeningStateChanged = (isListening) {
-      setState(() {
-        _isListening = isListening;
-      });
-    };
+    try {
+      _chromeSpeechService!.onResult = (String text) {
+        setState(() {
+          if (_textController.text.isEmpty) {
+            _textController.text = text;
+          } else {
+            _textController.text += ' ' + text;
+          }
+        });
+        _showSuccessSnackBar('✅ Chrome rozpoznał: ${text.length > 20 ? text.substring(0, 20) + "..." : text}');
+      };
+      
+      _chromeSpeechService!.onError = (String error) {
+        setState(() {
+          _errorMessage = error;
+        });
+        _showErrorSnackBar(error);
+      };
+      
+      _chromeSpeechService!.onListeningStateChanged = (bool isListening) {
+        setState(() {
+          _isListening = isListening;
+        });
+      };
+    } catch (e) {
+      debugPrint('❌ Błąd ustawiania Chrome callbacks: $e');
+    }
   }
 
   void _setupAndroidCallbacks() {
@@ -159,18 +190,26 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
   }
 
   void _startListening() async {
-    if (!_isInitialized) return;
+    if (!_isInitialized) {
+      _showErrorSnackBar('Serwis nie został zainicjalizowany');
+      return;
+    }
     
     setState(() {
       _errorMessage = '';
     });
     
-    if (_isWebPlatform) {
+    if (_isWebPlatform && _chromeSpeechService != null) {
       // CHROME - BEZ LIMITU! Mów ile chcesz
-      await _chromeSpeechService.startListening(
-        languageCode: 'pl-PL',
-        // Bez timeout - ciągłe nasłuchiwanie!
-      );
+      try {
+        await _chromeSpeechService!.startListening(
+          languageCode: 'pl-PL',
+          // Bez timeout - ciągłe nasłuchiwanie!
+        );
+      } catch (e) {
+        debugPrint('❌ Błąd Chrome startListening: $e');
+        _showErrorSnackBar('Błąd uruchamiania Chrome API: $e');
+      }
     } else if (_isAndroidPlatform) {
       // ANDROID - BEZ LIMITU! Natywne API
       await _androidSpeechService.startListening(
@@ -178,7 +217,7 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
         // Bez timeout - ciągłe nasłuchiwanie!
       );
     } else {
-      // DESKTOP - Python nadal ma limit 8s
+      // DESKTOP - Python z 8s limitem (ale działa!)
       await _desktopSpeechService.startListening(
         languageCode: 'pl-PL',
         timeout: const Duration(seconds: 8),
@@ -187,8 +226,12 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
   }
 
   void _stopListening() async {
-    if (_isWebPlatform) {
-      await _chromeSpeechService.stopListening();
+    if (_isWebPlatform && _chromeSpeechService != null) {
+      try {
+        await _chromeSpeechService?.stopListening();
+      } catch (e) {
+        debugPrint('❌ Błąd Chrome stopListening: $e');
+      }
     } else if (_isAndroidPlatform) {
       await _androidSpeechService.stopListening();
     } else {
@@ -197,8 +240,12 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
   }
 
   void _cancelListening() async {
-    if (_isWebPlatform) {
-      await _chromeSpeechService.cancelListening();
+    if (_isWebPlatform && _chromeSpeechService != null) {
+      try {
+        await _chromeSpeechService?.cancelListening();
+      } catch (e) {
+        debugPrint('❌ Błąd Chrome cancelListening: $e');
+      }
     } else if (_isAndroidPlatform) {
       await _androidSpeechService.cancelListening();
     } else {
@@ -210,8 +257,12 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
   }
 
   void _clearText() {
-    if (_isWebPlatform) {
-      _chromeSpeechService.clearText();
+    if (_isWebPlatform && _chromeSpeechService != null) {
+      try {
+        _chromeSpeechService?.clearText();
+      } catch (e) {
+        debugPrint('❌ Błąd Chrome clearText: $e');
+      }
     } else if (_isAndroidPlatform) {
       _androidSpeechService.clearText();
     } else {
@@ -259,7 +310,7 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
   String _getPlatformName() {
     if (_isWebPlatform) return 'Chrome';
     if (_isAndroidPlatform) return 'Android';
-    return 'Python';
+    return 'Python Desktop';
   }
 
   String _getPlatformIcon() {
@@ -320,6 +371,7 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
                 const Text('🎤 Rozpoznaje polską mowę przez Google API'),
                 const Text('📁 Plik speech_recognizer.py w głównym folderze'),
                 const Text('🌐 Wymaga połączenia internetowego'),
+                const Text('⏱️ Limit 8 sekund na nagranie'),
               ],
               const SizedBox(height: 12),
               Container(
@@ -334,7 +386,7 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
                     ? '💡 Tip: Mów naturalnie po polsku. Chrome rozpoznaje wszystko - od pojedynczych słów po długie zdania!'
                     : _isAndroidPlatform 
                       ? '💡 Tip: Mów naturalnie po polsku. Android użyje natywnego Google API. Możesz mówić bez limitu czasu!'
-                      : '💡 Tip: Mów wyraźnie po polsku. Python script użyje Google API do transkrypcji.',
+                      : '💡 Tip: Mów wyraźnie po polsku w ciągu 8 sekund. Python script użyje Google API do transkrypcji.',
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
@@ -359,9 +411,15 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
   }
 
   void _testConnection() async {
-    bool testResult;
-    if (_isWebPlatform) {
-      testResult = await _chromeSpeechService.testConnection();
+    bool testResult = false;
+    
+    if (_isWebPlatform && _chromeSpeechService != null) {
+      try {
+        testResult = await _chromeSpeechService?.testConnection() ?? false;
+      } catch (e) {
+        debugPrint('❌ Błąd Chrome testConnection: $e');
+        testResult = false;
+      }
     } else if (_isAndroidPlatform) {
       testResult = await _androidSpeechService.testConnection();
     } else {
@@ -377,8 +435,12 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
 
   @override
   void dispose() {
-    if (_isWebPlatform) {
-      _chromeSpeechService.dispose();
+    if (_isWebPlatform && _chromeSpeechService != null) {
+      try {
+        _chromeSpeechService?.dispose();
+      } catch (e) {
+        debugPrint('❌ Błąd Chrome dispose: $e');
+      }
     } else if (_isAndroidPlatform) {
       _androidSpeechService.dispose();
     } else {
@@ -631,7 +693,7 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
                   ? 'Naciśnij MÓWIĘ i powiedz cokolwiek po polsku!\nChrome używa tego samego Google API co Python script\n\n🔥 To prawdziwe rozpoznawanie na żywo!'
                   : _isAndroidPlatform
                     ? 'Naciśnij MÓWIĘ i mów po polsku bez limitu!\nAndroid używa natywnego Google API\n\n🤖 Ciągłe nasłuchiwanie na żywo!'
-                    : 'Naciśnij MÓWIĘ i powiedz zdania po polsku (8s)\nPython script użyje Google API do transkrypcji\n\n🐍 Wymaga speech_recognizer.py w głównym folderze')
+                    : 'Naciśnij MÓWIĘ i powiedz zdania po polsku (8s)\nPython script użyje Google API do transkrypcji\n\n🐍 Szybkie i dokładne rozpoznawanie!')
                 : 'Inicjalizowanie...',
               style: TextStyle(
                 fontSize: 12,

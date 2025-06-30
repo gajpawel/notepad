@@ -1,6 +1,8 @@
 import 'dart:async';
-import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
+
+// Conditional import dla dart:js - tylko na Web
+import 'dart:js' as js if (dart.library.io) 'dart:core';
 
 class ChromeSpeechService {
   static final ChromeSpeechService _instance = ChromeSpeechService._internal();
@@ -23,15 +25,77 @@ class ChromeSpeechService {
   // Tylko Web wspiera Web Speech API
   bool get isPlatformSupported => kIsWeb;
 
-  /// Inicjalizacja serwisu - JavaScript API
+  /// Inicjalizacja serwisu - JavaScript API (tylko Web)
   Future<bool> initialize() async {
     try {
       if (!kIsWeb) {
-        onError?.call('ChromeSpeechService działa tylko w przeglądarce');
+        debugPrint('ChromeSpeechService: Nie-Web platforma - wyłączony');
+        return false;
+      }
+
+      // Sprawdź czy dart:js jest dostępny
+      if (!_isJsAvailable()) {
+        onError?.call('JavaScript context nie jest dostępny');
         return false;
       }
 
       // Wstrzyknij JavaScript code bezpośrednio
+      _injectJavaScript();
+
+      // Ustaw Dart callbacks
+      _setupCallbacks();
+
+      // Sprawdź czy inicjalizacja się udała
+      bool initResult = _callJsMethod('init');
+      
+      if (initResult) {
+        _isInitialized = true;
+        debugPrint('✅ JavaScript Speech Service zainicjalizowany');
+        return true;
+      } else {
+        onError?.call('Przeglądarka nie wspiera Web Speech API');
+        return false;
+      }
+      
+    } catch (e) {
+      onError?.call('Błąd inicjalizacji JavaScript API: ${e.toString()}');
+      return false;
+    }
+  }
+
+  /// Sprawdź czy JavaScript context jest dostępny
+  bool _isJsAvailable() {
+    try {
+      // Na Web dart:js powinien być dostępny
+      return kIsWeb && js.context != null;
+    } catch (e) {
+      debugPrint('❌ dart:js nie jest dostępny: $e');
+      return false;
+    }
+  }
+
+  /// Wywołaj metodę JavaScript bezpiecznie
+  bool _callJsMethod(String method, [List<dynamic>? args]) {
+    try {
+      if (!_isJsAvailable()) return false;
+      
+      var speechRecognition = js.context['flutterSpeechRecognition'];
+      if (speechRecognition == null) return false;
+      
+      if (args != null) {
+        return speechRecognition.callMethod(method, args);
+      } else {
+        return speechRecognition.callMethod(method);
+      }
+    } catch (e) {
+      debugPrint('❌ Błąd wywołania JS metody $method: $e');
+      return false;
+    }
+  }
+
+  /// Wstrzyknij JavaScript kod
+  void _injectJavaScript() {
+    try {
       js.context.callMethod('eval', ['''
         window.flutterSpeechRecognition = {
           recognition: null,
@@ -40,6 +104,7 @@ class ChromeSpeechService {
           init: function() {
             try {
               if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                console.error('Web Speech API nie jest wspierane');
                 return false;
               }
               
@@ -69,7 +134,6 @@ class ChromeSpeechService {
               
               this.recognition.onresult = (event) => {
                 console.log('🔍 JavaScript: Otrzymano wynik');
-                console.log('Results length:', event.results.length);
                 
                 try {
                   for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -115,6 +179,7 @@ class ChromeSpeechService {
                 }
               };
               
+              console.log('✅ Web Speech API zainicjalizowane');
               return true;
             } catch (e) {
               console.error('❌ Błąd inicjalizacji:', e);
@@ -153,11 +218,16 @@ class ChromeSpeechService {
           }
         };
         
-        // Inicjalizuj od razu
-        window.flutterSpeechRecognition.init();
+        console.log('🚀 Flutter Speech Recognition JavaScript injected');
       ''']);
+    } catch (e) {
+      debugPrint('❌ Błąd wstrzykiwania JavaScript: $e');
+    }
+  }
 
-      // Ustaw Dart callbacks
+  /// Ustaw Dart callbacks
+  void _setupCallbacks() {
+    try {
       js.context['flutterSpeechCallbacks'] = js.JsObject.jsify({
         'onStart': () {
           debugPrint('🎤 Dart: Otrzymano onStart');
@@ -181,22 +251,8 @@ class ChromeSpeechService {
           onListeningStateChanged?.call(false);
         },
       });
-
-      // Sprawdź czy inicjalizacja się udała
-      bool initResult = js.context['flutterSpeechRecognition'].callMethod('init');
-      
-      if (initResult) {
-        _isInitialized = true;
-        debugPrint('✅ JavaScript Speech Service zainicjalizowany');
-        return true;
-      } else {
-        onError?.call('Przeglądarka nie wspiera Web Speech API');
-        return false;
-      }
-      
     } catch (e) {
-      onError?.call('Błąd inicjalizacji JavaScript API: ${e.toString()}');
-      return false;
+      debugPrint('❌ Błąd ustawiania callbacks: $e');
     }
   }
 
@@ -221,7 +277,7 @@ class ChromeSpeechService {
       _recognizedText = '';
       
       // Uruchom JavaScript funkcję
-      bool started = js.context['flutterSpeechRecognition'].callMethod('start', [languageCode]);
+      bool started = _callJsMethod('start', [languageCode]);
       
       if (!started) {
         onError?.call('Nie można uruchomić rozpoznawania');
@@ -249,7 +305,7 @@ class ChromeSpeechService {
   Future<void> stopListening() async {
     if (_isListening) {
       try {
-        js.context['flutterSpeechRecognition'].callMethod('stop');
+        _callJsMethod('stop');
         debugPrint('⏹️ Dart: Zatrzymano nasłuchiwanie');
       } catch (e) {
         debugPrint('❌ Błąd zatrzymywania: $e');
@@ -260,7 +316,7 @@ class ChromeSpeechService {
   /// Anuluj nasłuchiwanie
   Future<void> cancelListening() async {
     try {
-      js.context['flutterSpeechRecognition'].callMethod('abort');
+      _callJsMethod('abort');
       _recognizedText = '';
       _isListening = false;
       onListeningStateChanged?.call(false);
@@ -281,7 +337,7 @@ class ChromeSpeechService {
     
     try {
       // Prosta próba dostępu do mikrofonu
-      return true; // JavaScript sam sprawdzi uprawnienia
+      return _isJsAvailable();
     } catch (e) {
       debugPrint('❌ Test połączenia nieudany: $e');
       return false;
@@ -312,11 +368,13 @@ class ChromeSpeechService {
   void dispose() {
     try {
       if (_isListening) {
-        js.context['flutterSpeechRecognition'].callMethod('abort');
+        _callJsMethod('abort');
       }
       
       // Usuń callbacks
-      js.context.deleteProperty('flutterSpeechCallbacks');
+      if (_isJsAvailable()) {
+        js.context.deleteProperty('flutterSpeechCallbacks');
+      }
     } catch (e) {
       debugPrint('❌ Błąd dispose: $e');
     }
