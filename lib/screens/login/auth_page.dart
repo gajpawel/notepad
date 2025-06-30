@@ -1,10 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
-import '../../models/User.dart';
-import '../home/home_screen.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import '/services/auth_service.dart';
+import '/screens/home/home_screen.dart';
+import '/widgets/login_form.dart';
+import '/widgets/register_form.dart';
 import 'forgot_screen.dart';
-import '../../widgets/login_form.dart';
-import '../../widgets/register_form.dart';
+import '/models/User.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({Key? key}) : super(key: key);
@@ -18,6 +20,7 @@ class _AuthPageState extends State<AuthPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _loginController = TextEditingController();
   final TextEditingController _regLoginController = TextEditingController();
+  final TextEditingController _regEmailController = TextEditingController();
   final TextEditingController _regNameController = TextEditingController();
   final TextEditingController _regSurnameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -42,6 +45,7 @@ class _AuthPageState extends State<AuthPage> {
   void _switchAuthMode() {
     _loginController.clear();
     _regLoginController.clear();
+    _regEmailController.clear();
     _regNameController.clear();
     _regSurnameController.clear();
     _passwordController.clear();
@@ -67,44 +71,92 @@ class _AuthPageState extends State<AuthPage> {
           _loginController.text.trim(),
           _passwordController.text,
         );
+        if (!success) {
+          throw auth.FirebaseAuthException(
+            code: 'login-failed',
+            message: 'Nieprawidłowa nazwa użytkownika lub hasło',
+          );
+        }
+        if (mounted) _navigateToHomePage();
       } else {
         if (_passwordController.text != _confirmPasswordController.text) {
-          setState(() {
-            _errorMessage = 'Hasła nie są identyczne';
-            _isLoading = false;
-          });
-          return;
+          throw auth.FirebaseAuthException(
+            code: 'password-mismatch',
+            message: 'Hasła nie są identyczne',
+          );
         }
         success = await AuthService.register(
           _regLoginController.text.trim(),
+          _regEmailController.text.trim(),
           _regNameController.text.trim(),
           _regSurnameController.text.trim(),
           _passwordController.text,
         );
-        if (success)
-          await AuthService.login(
-            _regNameController.text.trim(),
-            _passwordController.text,
+        if (success) {
+          Fluttertoast.showToast(
+            msg: 'Rejestracja udana. Sprawdź e-mail, aby zweryfikować konto.',
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
           );
+          _switchAuthMode(); // Przełącz na tryb logowania
+        } else {
+          throw auth.FirebaseAuthException(
+            code: 'registration-failed',
+            message: 'Rejestracja nieudana',
+          );
+        }
       }
-
-      if (!success) {
-        setState(() {
-          _errorMessage =
-              isLogin
-                  ? 'Nieprawidłowy login lub hasło'
-                  : 'Użytkownik lub email już istnieje';
-          _isLoading = false;
-        });
-        return;
+    } on auth.FirebaseAuthException catch (e) {
+      String errorMessage;
+      switch (e.code) {
+        case 'invalid-email':
+          errorMessage = 'Nieprawidłowy format e-maila';
+          break;
+        case 'weak-password':
+          errorMessage = 'Hasło jest za słabe';
+          break;
+        case 'email-already-in-use':
+          errorMessage = 'E-mail jest już zajęty';
+          break;
+        case 'wrong-password':
+          errorMessage = 'Nieprawidłowe hasło';
+          break;
+        case 'user-not-found':
+          errorMessage = 'Nie znaleziono użytkownika';
+          break;
+        case 'user-mismatch':
+          errorMessage = 'Błąd dopasowania użytkownika';
+          break;
+        case 'email-not-verified':
+          errorMessage = 'Zweryfikuj swój adres e-mail przed zalogowaniem';
+          break;
+        case 'registration-failed':
+        case 'login-failed':
+        case 'password-mismatch':
+          errorMessage = e.message ?? 'Wystąpił błąd';
+          break;
+        default:
+          errorMessage = 'Wystąpił nieoczekiwany błąd: ${e.message}';
       }
-
-      if (mounted) _navigateToHomePage();
-    } catch (e) {
       setState(() {
-        _errorMessage = 'Wystąpił błąd';
+        _errorMessage = errorMessage;
         _isLoading = false;
       });
+      Fluttertoast.showToast(
+        msg: errorMessage,
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+      );
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Wystąpił nieoczekiwany błąd';
+        _isLoading = false;
+      });
+      Fluttertoast.showToast(
+        msg: 'Wystąpił nieoczekiwany błąd',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+      );
     }
   }
 
@@ -151,6 +203,7 @@ class _AuthPageState extends State<AuthPage> {
                             if (!isLogin)
                               RegisterForm(
                                 loginController: _regLoginController,
+                                emailController: _regEmailController,
                                 nameController: _regNameController,
                                 surnameController: _regSurnameController,
                                 passwordController: _passwordController,
@@ -203,26 +256,6 @@ class _AuthPageState extends State<AuthPage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _navigateToHomePage,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                backgroundColor: Colors.green,
-                              ),
-                              child: const Text(
-                                'PRZEJDŹ DO STRONY GŁÓWNEJ (DEBUG)',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
                             if (_errorMessage != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8.0),
@@ -249,7 +282,9 @@ class _AuthPageState extends State<AuthPage> {
   void dispose() {
     _loginController.dispose();
     _regLoginController.dispose();
+    _regEmailController.dispose();
     _regNameController.dispose();
+    _regSurnameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();

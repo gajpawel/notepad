@@ -17,10 +17,18 @@ class LoginForm extends StatelessWidget {
         TextFormField(
           controller: loginController,
           decoration: const InputDecoration(
-            labelText: 'Login (nazwa użytkownika)',
+            labelText: 'Nazwa użytkownika',
             border: OutlineInputBorder(),
           ),
-          validator: (value) => value!.isEmpty ? 'Podaj login' : null,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Podaj nazwę użytkownika';
+            }
+            if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
+              return 'Tylko litery i cyfry';
+            }
+            return null;
+          },
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -30,7 +38,12 @@ class LoginForm extends StatelessWidget {
             labelText: 'Hasło',
             border: OutlineInputBorder(),
           ),
-          validator: (value) => value!.isEmpty ? 'Podaj hasło' : null,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Podaj hasło';
+            }
+            return null;
+          },
         ),
       ],
     );
