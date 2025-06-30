@@ -117,7 +117,6 @@ class _SpeechRecognitionScreenState extends State<SpeechRecognitionScreen> {
       // CHROME - używa Web Speech API (Google w tle)
       await _chromeSpeechService.startListening(
         languageCode: 'pl-PL', // Polski jak w speech_recognizer.py
-        timeout: const Duration(seconds: 30), // Długi timeout dla Chrome
       );
     } else {
       // DESKTOP - używa speech_recognizer.py
