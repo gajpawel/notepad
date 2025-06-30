@@ -1,33 +1,41 @@
-// Only compiled on mobile (Android/iOS)
-import 'dart:io';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:path_provider/path_provider.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:flutter_quill/quill_delta.dart';
 import '../models/Note.dart';
 
 Future<void> downloadNote(Note note, BuildContext context) async {
+  const platform = MethodChannel('com.example.notepad/files');
+
   try {
-    final status = await Permission.storage.request();
-    if (!status.isGranted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Brak uprawnień do zapisu pliku')),
-      );
-      return;
+    String plainText;
+    try {
+      final deltaJson = jsonDecode(note.Content);
+      final delta = Delta.fromJson(deltaJson as List);
+      final doc = quill.Document.fromDelta(delta);
+      plainText = doc.toPlainText();
+    } catch (e) {
+      plainText = note.Content;
     }
 
-    final directory = await getExternalStorageDirectory();
-    if (directory == null) throw Exception("Brak dostępu do katalogu");
+    final result = await platform.invokeMethod('saveToDownloads', {
+      'fileName': '${note.Name}.txt',
+      'content': plainText,
+    });
 
-    final path = '${directory.path}/${note.Name}.txt';
-    final file = File(path);
-    await file.writeAsString(note.Content);
-
+    if (result == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Notatka zapisana w Downloads')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nie udało się zapisać pliku')),
+      );
+    }
+  } on PlatformException catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notatka zapisana jako plik .txt')),
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Błąd zapisu: $e')),
+      SnackBar(content: Text('Błąd zapisu: ${e.message}')),
     );
   }
 }

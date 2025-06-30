@@ -12,18 +12,22 @@ import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import android.content.ContentValues
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "flutter_speech_recognition"
     private val MICROPHONE_PERMISSION_CODE = 200
-    
+    private val CHANNEL_FILES = "com.example.notepad/files"
     private var speechRecognizer: SpeechRecognizer? = null
     private var methodChannel: MethodChannel? = null
     private var isListening = false
-    
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
+
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -32,7 +36,7 @@ class MainActivity: FlutterActivity() {
                 }
                 "checkMicrophonePermission" -> {
                     val hasPermission = ContextCompat.checkSelfPermission(
-                        this, 
+                        this,
                         Manifest.permission.RECORD_AUDIO
                     ) == PackageManager.PERMISSION_GRANTED
                     result.success(hasPermission)
@@ -47,7 +51,7 @@ class MainActivity: FlutterActivity() {
                     val continuous = call.argument<Boolean>("continuous") ?: true
                     val maxResults = call.argument<Int>("maxResults") ?: 1
                     val timeoutMillis = call.argument<Int>("timeoutMillis")
-                    
+
                     startListening(language, partialResults, continuous, maxResults, timeoutMillis)
                     result.success(true)
                 }
@@ -62,7 +66,7 @@ class MainActivity: FlutterActivity() {
                 "getAvailableLanguages" -> {
                     // Podstawowe języki - Android może mieć więcej
                     val languages = listOf(
-                        "pl-PL", "en-US", "en-GB", "de-DE", "fr-FR", 
+                        "pl-PL", "en-US", "en-GB", "de-DE", "fr-FR",
                         "es-ES", "it-IT", "ru-RU", "ja-JP", "ko-KR"
                     )
                     result.success(languages)
@@ -72,6 +76,21 @@ class MainActivity: FlutterActivity() {
                 }
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.notepad/files")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "saveToDownloads") {
+                    val fileName = call.argument<String>("fileName")
+                    val content = call.argument<String>("content")
+                    if (fileName != null && content != null) {
+                        val success = saveTextToDownloads(fileName, content)
+                        result.success(success)
+                    } else {
+                        result.success(false)
+                    }
+                } else {
+                    result.notImplemented()
+                }
+            }
     }
     
     private fun requestMicrophonePermission() {
@@ -248,7 +267,33 @@ class MainActivity: FlutterActivity() {
             methodChannel?.invokeMethod("onListeningStopped", null)
         }
     }
-    
+
+    private fun saveTextToDownloads(fileName: String, content: String): Boolean {
+        return try {
+            val resolver = contentResolver
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+            }
+
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                ?: return false
+
+            val outputStream = resolver.openOutputStream(uri)
+            outputStream?.write(content.toByteArray())
+            outputStream?.flush()
+            outputStream?.close()
+
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         cancelListening()
