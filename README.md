@@ -65,7 +65,7 @@ Zaawansowany notatnik napisany we Flutterze z funkcjami rozpoznawania mowy i tek
 
 ### 1. Sklonuj repozytorium
 ```bash
-git clone [URL_REPO]
+git clone https://github.com/gajpawel/notepad
 cd noteable
 ```
 
