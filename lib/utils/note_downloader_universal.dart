@@ -8,8 +8,14 @@ import 'package:flutter_quill_to_pdf/flutter_quill_to_pdf.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import '../models/Note.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:flutter/services.dart';
 
 Future<void> downloadNote(Note note, BuildContext context) async {
+  final robotoFont = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/Roboto-Regular.ttf')
+  );
+
   try {
     quill.Document doc;
     try {
@@ -37,7 +43,9 @@ Future<void> downloadNote(Note note, BuildContext context) async {
         title: note.Name,
         author: 'Notepad App',
         producer: 'Notepad App',
-      ), fallbacks: [],
+      ),
+      themeData: pw.ThemeData.withFont(base: robotoFont),
+      fallbacks: [robotoFont],
     );
 
     final pdfDoc = await pdfConverter.createDocument();
