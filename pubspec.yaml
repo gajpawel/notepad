@@ -33,6 +33,9 @@ dependencies:
   flutter_quill: ^11.4.1
   web: 1.1.1
   firebase_auth: ^5.3.1
+  pdf: ^3.10.4
+  printing: ^5.11.0
+  flutter_quill_to_pdf: ^2.3.7
   
 dev_dependencies:
   flutter_test:

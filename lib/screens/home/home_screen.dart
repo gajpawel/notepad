@@ -798,8 +798,21 @@ void _addCollaborator(Note note) async {
     _loadData();
   }
 
-  void _downloadNote(Note note) {
+  Future<void> _downloadNote(Note note) async {
     try {
+      final noteRef = _db.child('Note');
+      final snapshot = await noteRef.get();
+
+      if (snapshot.exists && snapshot.value is Map) {
+        final data = snapshot.value as Map;
+        for (var item in data.values) {
+          if (item is Map && item['Id'] == note.Id) {
+            note = Note.fromJson(Map<String, dynamic>.from(item));
+            break;
+          }
+        }
+      }
+
       downloadNote(note, context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
